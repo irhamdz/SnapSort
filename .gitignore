@@ -1,0 +1,25 @@
+# Baton runtime state (do not commit)
+.baton/tasks/
+.baton/events.ndjson*
+.baton/locks.yaml
+.baton/results/
+.baton/session.yaml
+.baton/feedback/
+.baton/annealing/
+
+# Baton config & specs (commit these)
+# .baton/agents.yaml  ← keep
+# .baton/project-brief.md  ← keep
+# .baton/specs/  ← keep
+# .baton/skills/  ← keep
+
+# macOS
+.DS_Store
+
+# Node / frontend
+node_modules/
+dist/
+
+# Rust / Tauri
+target/
+src-tauri/target/
