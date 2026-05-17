@@ -1,0 +1,53 @@
+spec:
+  what: |
+    Implement batch operations as first-class features over a transient
+    Selection Set: Batch Delete, Categorize, Rename, Tag, Archive, Move,
+    Add-to-Collection. DB-only mutations (categorize, tag, archive,
+    add-to-collection) execute in a SINGLE SQLite transaction (atomic).
+    Filesystem ops (rename, move, delete→Trash) run per-file, are NOT rolled
+    back on partial failure, and return a per-file error summary. Build the
+    `useBatchStore`, Batch Action Bar, and command/API surface.
+
+  why: |
+    PRD v1.1 made batch-first a core principle (P0 for delete/categorize/
+    rename): managing 500 screenshots must be as easy as 5. DB batch writes
+    must be all-or-nothing; filesystem batches are inherently best-effort, and
+    the UI must communicate that asymmetry.
+
+  constraints:
+    - "DB-only batch mutations MUST be one transaction (atomic)"
+    - "Filesystem batch ops are per-file best-effort; do NOT roll back successes"
+    - "Selection Set is transient (useBatchStore), cleared on navigation"
+    - "Destructive batch actions require explicit click confirm, not Enter (see spec 0016)"
+
+  context_files:
+    - .baton/docs/adr/0014-batch-operations-first-class-transactional.md
+    - .baton/docs/adr/0016-destructive-deletes-route-to-os-trash.md
+    - .baton/skills/backend/conventions.md
+    - .baton/skills/frontend/conventions.md
+
+  writes_to:
+    - src-tauri/src/commands/batch.rs
+    - src-tauri/src/db/mod.rs
+    - src-tauri/src/lib.rs
+    - src/api/index.ts
+    - src/stores/batchStore.ts
+
+  decisions:
+    - question: "How do batch operations handle atomicity?"
+      answer: "DB-only batches in one transaction; filesystem batches per-file best-effort with error report"
+      reason: "Atomic where possible; honest about FS partial-failure semantics (ADR-0014)"
+      decided_by: human
+
+  acceptance_criteria:
+    - "A DB batch (e.g. categorize 100) fully applies or fully rolls back on error"
+    - "A rename batch with one bad file reports that file and keeps the rest"
+    - "Selection Set clears on sidebar navigation"
+    - "Batch commands exposed via `src/api/index.ts`; FTS stays consistent"
+
+  acceptance_checks:
+    - command: "cargo test --manifest-path src-tauri/Cargo.toml batch"
+      expect_exit: 0
+      description: "Batch transaction atomicity + partial-failure tests pass"
+
+  criticality: high
