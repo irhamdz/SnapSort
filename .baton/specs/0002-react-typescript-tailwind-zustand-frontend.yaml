@@ -1,0 +1,67 @@
+spec:
+  what: |
+    Set up the SnapSort frontend: React 19 + TypeScript with Vite, Tailwind
+    CSS v4 as the only styling system, and Zustand for client state. Create the
+    app shell (`src/main.tsx`, root component, `src/styles.css` Tailwind entry),
+    empty store slices `useGalleryStore`/`useBatchStore`/`useSettingsStore`
+    under `src/stores/`, and an empty typed IPC layer `src/api/index.ts` that
+    wraps `invoke`.
+
+  why: |
+    The UI renders a virtualized gallery of 10k+ thumbnails, batch selection,
+    detail panel, settings, and onboarding. React+TS gives the largest OSS
+    contributor pool and compile-time parity with the Rust IPC contract;
+    Zustand fits the "fetch via command, cache in store" model without Redux
+    weight; Tailwind-only keeps styling consistent. Every UI spec depends on
+    this scaffold.
+
+  constraints:
+    - "Tailwind utilities ONLY — no CSS modules, no inline styles"
+    - "No direct `invoke()` in components — all IPC through `src/api/`"
+    - "One Zustand store slice per domain; no derived data in stores (use selectors)"
+    - "Do NOT introduce Redux, MobX, or React Context for global state"
+
+  context_files:
+    - .baton/docs/adr/0002-react-typescript-tailwind-zustand-frontend.md
+    - .baton/docs/adr/0017-typed-ipc-contract-single-boundary.md
+    - .baton/skills/frontend/conventions.md
+    - .baton/project-brief.md
+
+  writes_to:
+    - package.json
+    - vite.config.ts
+    - tsconfig.json
+    - src/main.tsx
+    - src/App.tsx
+    - src/styles.css
+    - src/api/index.ts
+    - src/stores/galleryStore.ts
+    - src/stores/batchStore.ts
+    - src/stores/settingsStore.ts
+
+  decisions:
+    - question: "What is the frontend stack?"
+      answer: "React 19 + TypeScript + Vite, Tailwind CSS v4, Zustand"
+      reason: "Largest OSS ecosystem, TS mirrors Rust IPC types, Zustand fits Tauri command model without Redux boilerplate (ADR-0002)"
+      decided_by: human
+    - question: "How is global client state managed?"
+      answer: "Zustand, one store slice per domain (gallery, batch, settings)"
+      reason: "Minimal hook-based model; Selection Set is transient view state (ADR-0002, frontend conventions)"
+      decided_by: human
+
+  acceptance_criteria:
+    - "`npm run build` (tsc + vite build) succeeds"
+    - "Tailwind v4 compiles from `src/styles.css`; a utility class renders"
+    - "Three Zustand store slices exist and export `use*` hooks"
+    - "`src/api/index.ts` exists as the sole `invoke` wrapper module"
+    - "No CSS modules / inline styles present in the scaffold"
+
+  acceptance_checks:
+    - command: "test -f package.json && test -f src/api/index.ts"
+      expect_exit: 0
+      description: "Frontend scaffold and API layer exist"
+    - command: "npm run build"
+      expect_exit: 0
+      description: "Frontend type-checks and builds"
+
+  criticality: high
