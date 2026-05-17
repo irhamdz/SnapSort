@@ -1,0 +1,52 @@
+spec:
+  what: |
+    Enforce privacy-by-default project-wide: no telemetry, no analytics, no
+    accounts, no cloud sync. All data (DB, thumbnails, settings) lives in the
+    OS app-data dir via the Tauri path API (no hard-coded paths). The ONLY
+    permitted outbound network traffic is to a user-configured AI provider, and
+    only when one is set; the default (Ollama) is local. Add a build/test guard
+    that fails if a disallowed network/telemetry call is introduced.
+
+  why: |
+    Screenshots routinely contain credentials, financial data, and private
+    messages. The product's positioning and the privacy-first persona depend on
+    a credible "nothing leaves the machine unless you opt into cloud AI"
+    guarantee.
+
+  constraints:
+    - "No telemetry/analytics SDK, crash-phone-home, or account system anywhere"
+    - "No cloud sync; data stays in the local OS app-data dir"
+    - "Only outbound calls allowed: user-configured AI provider endpoints"
+    - "No hard-coded filesystem paths — use Tauri path API"
+
+  context_files:
+    - .baton/docs/adr/0015-privacy-by-default.md
+    - .baton/docs/adr/0008-bundled-tesseract-offline-ocr.md
+    - .baton/docs/adr/0004-sqlite-fts5-full-text-search.md
+    - .baton/project-brief.md
+
+  writes_to:
+    - src-tauri/src/lib.rs
+    - src-tauri/tests/privacy.rs
+
+  decisions:
+    - question: "What is the data/network privacy posture?"
+      answer: "Privacy by default: no telemetry/accounts/sync; only opt-in user AI provider calls"
+      reason: "Sensitive screenshot content; privacy-first persona (ADR-0015, PRD §1.3)"
+      decided_by: human
+
+  acceptance_criteria:
+    - "No telemetry/analytics dependency in Cargo.toml or package.json"
+    - "Search and OCR make zero network calls (verified)"
+    - "All app data resolves under the OS app-data dir; no hard-coded paths"
+    - "A guard test fails if a non-AI outbound call is added"
+
+  acceptance_checks:
+    - command: "cargo test --manifest-path src-tauri/Cargo.toml privacy"
+      expect_exit: 0
+      description: "Privacy guard test passes"
+    - command: "grep -RInE 'segment|amplitude|sentry|mixpanel|google-analytics' src-tauri/src src || true"
+      expect_exit: 0
+      description: "No telemetry SDK references (manual review of any hits)"
+
+  criticality: high

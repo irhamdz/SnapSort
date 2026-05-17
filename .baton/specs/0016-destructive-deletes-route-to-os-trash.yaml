@@ -1,0 +1,50 @@
+spec:
+  what: |
+    Implement delete (single and batch) so it removes the DB record AND sends
+    the underlying file to the OS Trash via the `trash` crate — never a hard
+    unlink that bypasses Trash. There is no in-app undo for delete. Delete
+    confirmation requires an explicit click on a labeled destructive button
+    (e.g. "Delete 47"), NOT the Enter key, to prevent accidental mass deletion.
+
+  why: |
+    Delete — especially batch delete of hundreds of files — is irreversible in
+    SnapSort and acts on real user files. Routing to OS Trash provides a
+    recovery net without building a bespoke in-app recycle bin; calibrated
+    confirmation friction guards against accidental mass loss.
+
+  constraints:
+    - "Use the `trash` crate — never `std::fs::remove_file`/hard unlink for screenshots"
+    - "No in-app undo for delete (recovery is via OS Trash)"
+    - "Confirm requires explicit destructive-button click, not Enter"
+    - "DB record removal + file-to-Trash may be async; tolerate brief divergence"
+
+  context_files:
+    - .baton/docs/adr/0016-destructive-deletes-route-to-os-trash.md
+    - .baton/docs/adr/0014-batch-operations-first-class-transactional.md
+    - .baton/skills/backend/conventions.md
+    - .baton/skills/frontend/conventions.md
+
+  writes_to:
+    - src-tauri/src/commands/screenshots.rs
+    - src-tauri/src/commands/batch.rs
+    - src-tauri/Cargo.toml
+    - src/api/index.ts
+
+  decisions:
+    - question: "How are screenshots deleted?"
+      answer: "DB record removed + file sent to OS Trash via `trash` crate; no in-app undo; explicit-click confirm"
+      reason: "Recoverable safety net for irreversible (esp. batch) deletes (ADR-0016, PRD F-37)"
+      decided_by: human
+
+  acceptance_criteria:
+    - "Deleting a screenshot removes the row and moves the file to OS Trash (not unlink)"
+    - "Batch delete routes every file to Trash and reports per-file failures"
+    - "No hard `remove_file` of screenshot files anywhere (grep clean)"
+    - "Frontend delete confirm is bound to a button click, not Enter"
+
+  acceptance_checks:
+    - command: "cargo test --manifest-path src-tauri/Cargo.toml delete"
+      expect_exit: 0
+      description: "Delete-to-Trash (single + batch) tests pass"
+
+  criticality: high
