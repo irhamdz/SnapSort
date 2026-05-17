@@ -1,6 +1,6 @@
 orchestrator:
   runtime: claude-code
-  model: claude-opus-4-6
+  model: sonnet
 
 runtimes:
   claude-code:
@@ -13,7 +13,7 @@ runtimes:
       - "{{prompt}}"
     workdir: inherit
     models:
-      - claude-opus-4-6
+      - sonnet
     tool_restriction:
       flag: "--allowedTools"
       format: "comma-separated"
@@ -29,10 +29,9 @@ runtimes:
       - "--dangerously-skip-permissions"
     workdir: inherit
     models:
-      - nvidia/moonshotai/kimi-k2.5
-      - minimax-coding-plan/MiniMax-M2.7-highspeed
-      - deepseek/deepseek-chat-v3-0324
-      - google/gemini-flash-1.5
+      - CrofAI/kimi-k2.5
+      - CrofAI/glm-5.1-precision
+      - CrofAI/glm-5
 
   codex:
     command: codex
@@ -48,7 +47,7 @@ runtimes:
 
 defaults:
   runtime: opencode
-  model: minimax-coding-plan/MiniMax-M2.7-highspeed
+  model: CrofAI/glm-5.1-precision
 
 routing:
   rules:
@@ -56,34 +55,35 @@ routing:
         domain: [frontend, ui, css, react, tailwind, typescript]
       action: delegate
       runtime: opencode
-      model: nvidia/moonshotai/kimi-k2.5
+      model: CrofAI/kimi-k2.5
 
     - match:
         domain: [backend, rust, tauri, sqlite, ocr, watcher]
       action: delegate
       runtime: opencode
-      model: deepseek/deepseek-chat-v3-0324
+      model: CrofAI/glm-5.1-precision
 
     - match:
         domain: [testing, boilerplate, migration]
       action: delegate
       runtime: opencode
-      model: google/gemini-flash-1.5
+      model: CrofAI/glm-5
 
     - match:
         domain: [architecture, security, design, planning]
       action: delegate
       runtime: claude-code
-      model: claude-opus-4-6
+      model: sonnet
+      reason: "Claude's strength in reasoning and planning makes it ideal for high-level tasks."
 
     - match:
         default: true
       action: delegate
       runtime: opencode
-      model: minimax-coding-plan/MiniMax-M2.7-highspeed
+      model: CrofAI/glm-5.1-precision
 
   checkpoint_interval: 3
-  critical_review: claude-opus-4-6
+  critical_review: sonnet
 
 phase_machine:
   enabled: true
@@ -95,19 +95,19 @@ phase_machine:
 role_models:
   lead:
     runtime: claude-code
-    model: claude-opus-4-6
+    model: sonnet
   developer:
     runtime: opencode
-    model: nvidia/moonshotai/kimi-k2.5
+    model: CrofAI/kimi-k2.5
   reviewer:
-    runtime: claude-code
-    model: claude-opus-4-6
+    runtime: opencode
+    model: CrofAI/glm-5.1-precision
   test_lead:
-    runtime: claude-code
-    model: claude-opus-4-6
+    runtime: opencode
+    model: CrofAI/glm-5
   tester:
     runtime: opencode
-    model: google/gemini-flash-1.5
+    model: CrofAI/glm-5
 
 skills:
   dir: .baton/skills/

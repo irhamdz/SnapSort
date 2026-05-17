@@ -1,0 +1,48 @@
+spec:
+  what: |
+    Implement thumbnail generation at ingestion: decode the source image,
+    downscale to a bounded preview size, encode compactly, and store the bytes
+    in the `screenshots.thumbnail` BLOB column. Provide a repository/command
+    path to fetch a thumbnail by id, and ensure list queries that render the
+    grid do NOT select the BLOB column unless needed.
+
+  why: |
+    The gallery virtualizes thousands of cards and must render previews without
+    loading multi-MB originals — and originals can be moved/renamed by the user
+    or Rules. Storing thumbnails as DB BLOBs keeps the library self-contained
+    (one backupable file) and decouples preview availability from source file
+    location.
+
+  constraints:
+    - "Do NOT build a separate on-disk thumbnail cache directory"
+    - "Do NOT select the thumbnail BLOB in list/grid queries that don't render it"
+    - "Thumbnail dimensions/encoding must be bounded to control DB growth"
+    - "Generation must be async and off the watcher thread"
+
+  context_files:
+    - .baton/docs/adr/0005-thumbnails-as-sqlite-blobs.md
+    - .baton/docs/adr/0011-ingestion-pipeline-state-machine.md
+    - .baton/skills/backend/conventions.md
+
+  writes_to:
+    - src-tauri/src/commands/screenshots.rs
+    - src-tauri/src/db/mod.rs
+
+  decisions:
+    - question: "Where are thumbnails stored?"
+      answer: "As BLOBs in the screenshots table, generated at ingestion"
+      reason: "Self-contained backupable library; survives source file moves/renames (ADR-0005)"
+      decided_by: human
+
+  acceptance_criteria:
+    - "Ingesting an image populates a bounded-size thumbnail BLOB"
+    - "Thumbnail is retrievable by screenshot id"
+    - "Grid/list queries exclude the BLOB column; a separate call fetches it"
+    - "Generation runs async; the watcher thread is not blocked"
+
+  acceptance_checks:
+    - command: "cargo test --manifest-path src-tauri/Cargo.toml thumbnail"
+      expect_exit: 0
+      description: "Thumbnail generation + retrieval tests pass"
+
+  criticality: medium

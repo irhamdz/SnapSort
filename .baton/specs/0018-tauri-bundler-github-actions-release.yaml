@@ -1,0 +1,51 @@
+spec:
+  what: |
+    Create a GitHub Actions release workflow that, on a version tag push,
+    builds SnapSort with the Tauri bundler on platform runners and publishes
+    artifacts: `.dmg` (macOS), `.exe`/MSI (Windows), and `.AppImage` where
+    applicable, attached to a GitHub Release. Wire macOS signing/notarization
+    and Windows signing to use CI secrets (no plaintext). Releases are
+    reproducible from CI only — never a maintainer's local machine.
+
+  why: |
+    SnapSort ships native installers from an open-source repo; manual
+    cross-platform builds are error-prone and unscalable, and the future
+    auto-updater (F-33) needs a consistent, versioned artifact feed with a
+    transparent, trustable build process.
+
+  constraints:
+    - "Trigger on version tag push only (e.g. v*.*.*)"
+    - "Use Tauri bundler; produce per-OS artifacts on matching runners"
+    - "Signing/notarization secrets via CI secrets — never committed"
+    - "Release path must not depend on any local developer machine"
+
+  context_files:
+    - .baton/docs/adr/0018-tauri-bundler-github-actions-release.md
+    - .baton/docs/adr/0001-tauri-2-application-framework.md
+    - .baton/project-brief.md
+    - SnapSort_PRD.md
+
+  writes_to:
+    - .github/workflows/release.yml
+
+  decisions:
+    - question: "How are release binaries produced?"
+      answer: "Tauri bundler via GitHub Actions, tag-triggered, per-OS runners, signed with CI secrets"
+      reason: "Reproducible OSS-trustable artifact feed for the auto-updater (ADR-0018)"
+      decided_by: human
+
+  acceptance_criteria:
+    - "Pushing a `v*` tag triggers the workflow on macOS + Windows runners"
+    - "Workflow yields .dmg, .exe/MSI (+ .AppImage where applicable) on a Release"
+    - "Signing/notarization read from CI secrets; nothing secret in the repo"
+    - "Workflow YAML is valid and self-contained"
+
+  acceptance_checks:
+    - command: "test -f .github/workflows/release.yml"
+      expect_exit: 0
+      description: "Release workflow exists"
+    - command: "python3 -c \"import sys,yaml; yaml.safe_load(open('.github/workflows/release.yml'))\""
+      expect_exit: 0
+      description: "Workflow YAML parses"
+
+  criticality: medium
