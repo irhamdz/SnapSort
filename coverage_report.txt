@@ -1,0 +1,29 @@
+
+> snapsort@0.1.0 test:coverage
+> vitest run --coverage
+
+
+ RUN  v4.1.6 /Users/irhamdzuhri/Personal/Code/Projects/SnapSort-wt-0002
+      Coverage enabled with v8
+
+
+ Test Files  8 passed (8)
+      Tests  73 passed (73)
+   Start at  20:23:27
+   Duration  1.32s (transform 607ms, setup 1.36s, import 952ms, tests 262ms, environment 5.13s)
+
+ % Coverage report from v8
+-------------------|---------|----------|---------|---------|-------------------
+File               | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s 
+-------------------|---------|----------|---------|---------|-------------------
+All files          |     100 |     87.5 |     100 |     100 |                   
+ src/stores        |     100 |     87.5 |     100 |     100 |                   
+  ...lleryStore.ts |     100 |       50 |     100 |     100 | 50                
+-------------------|---------|----------|---------|---------|-------------------
+
+=============================== Coverage summary ===============================
+Statements   : 100% ( 62/62 )
+Branches     : 87.5% ( 7/8 )
+Functions    : 100% ( 56/56 )
+Lines        : 100% ( 46/46 )
+================================================================================
