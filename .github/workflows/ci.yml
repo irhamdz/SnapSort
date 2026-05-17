@@ -1,0 +1,149 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+        node-version: [20.x]
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Run lint:ipc
+      run: npm run lint:ipc
+
+    - name: Run unit tests
+      run: npm test -- --run
+
+    - name: Run tests with coverage
+      run: npm run test:coverage
+
+    - name: Generate coverage report
+      run: npm run test:coverage
+
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v4
+      with:
+        files: ./coverage/lcov.info
+        flags: unittests
+        name: codecov-umbrella
+        fail_ci_if_error: false
+
+    - name: Check coverage threshold
+      run: |
+        # Check if coverage meets minimum requirements
+        # This is a simplified check - adjust thresholds as needed
+        coverage=$(cat coverage/lcov.info | grep -E "^SF:" | wc -l)
+        if [ $coverage -eq 0 ]; then
+          echo "No coverage data found"
+          exit 1
+        fi
+        echo "Coverage report generated with $coverage source files covered"
+
+    - name: Build frontend
+      run: npm run build
+
+  lint:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20.x'
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Run TypeScript type check
+      run: npm run build
+
+    - name: Check for direct invoke() calls
+      run: |
+        if grep -r "invoke(" src/components src/stores src/api --include="*.ts" --include="*.tsx" | grep -v "src/api/index.ts" | grep -v "test"; then
+          echo "❌ Found direct invoke() calls outside API layer"
+          exit 1
+        fi
+        echo "✅ No direct invoke() calls found"
+
+    - name: Check for inline SQL in Rust commands
+      run: |
+        if grep -rE "['\"](SELECT|INSERT|UPDATE|DELETE|CREATE|ALTER|DROP|VALUES|FROM|WHERE|JOIN|ORDER|GROUP|HAVING|LIMIT|OFFSET|INTO|AS|DISTINCT|ALL|EXISTS|IN|BETWEEN|LIKE|IS|NULL|AND|OR|NOT|CASE|WHEN|THEN|ELSE|END|ON|SET|TABLE|INDEX|PRIMARY|FOREIGN|KEY|REFERENCES|UNIQUE|CHECK|DEFAULT|CONSTRAINT|REFERENCES|ON|CASCADE|RESTRICT|NO|ACTION|DEFERRABLE|INITIALLY|DEFERRED|IMMEDIATE|WITH|RECURSIVE)" src-tauri/src/commands --include="*.rs" | grep -v "test"; then
+          echo "❌ Found inline SQL in Rust commands"
+          exit 1
+        fi
+        echo "✅ No inline SQL found in Rust commands"
+
+  security:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20.x'
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Run security audit
+      run: npm audit --audit-level=moderate
+
+  build:
+    needs: [test, lint, security]
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+        node-version: [20.x]
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Build frontend
+      run: npm run build
+
+    - name: Build Tauri app
+      uses: tauri-apps/tauri-action@v0
+      with:
+        tagName: ${{ github.ref_name }}
+        releaseName: 'SnapSort ${{ github.ref_name }}'
+        releaseBody: 'See https://github.com/${{ github.repository }}/releases for details.'
+        releaseDraft: true
+        prerelease: false

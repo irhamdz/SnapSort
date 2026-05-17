@@ -1,0 +1,59 @@
+spec:
+  what: |
+    Add full-text search via SQLite FTS5. Create a migration adding the
+    `screenshots_fts` virtual table over (summary, ocr_text, category,
+    app_detected, tags, user_notes) plus INSERT/UPDATE/DELETE triggers that
+    keep it in sync with `screenshots`. Implement a repository search method
+    ranked by BM25, composable with structured filters (date range, category,
+    tag, app), and a `search_screenshots` Tauri command + typed API wrapper.
+
+  why: |
+    Search is a P0 capability that must work fully offline and WITHOUT AI:
+    keystroke-driven, 300ms-debounced, ranked by relevance across OCR text and
+    metadata. FTS5 was chosen over an external index/service to preserve the
+    zero-setup, offline-first, privacy guarantees — search ships inside the DB.
+
+  constraints:
+    - "NEVER write to `screenshots_fts` directly — only via `screenshots` so triggers fire"
+    - "Search must make zero network calls"
+    - "Ranking must use BM25, not date-only ordering"
+    - "Filters compose ON TOP of the text query in the same SQL path"
+
+  context_files:
+    - .baton/docs/adr/0004-sqlite-fts5-full-text-search.md
+    - .baton/docs/adr/0003-sqlite-rusqlite-embedded-store.md
+    - .baton/skills/backend/conventions.md
+    - SnapSort_PRD.md
+
+  writes_to:
+    - src-tauri/migrations/002_fts.sql
+    - src-tauri/src/db/mod.rs
+    - src-tauri/src/commands/search.rs
+    - src-tauri/src/lib.rs
+    - src/api/index.ts
+
+  decisions:
+    - question: "What powers full-text search?"
+      answer: "SQLite FTS5 virtual table kept in sync by triggers, BM25 ranking"
+      reason: "No extra service; offline + private; transactionally consistent with writes (ADR-0004)"
+      decided_by: human
+    - question: "Which fields are searchable?"
+      answer: "summary, ocr_text, category, app_detected, tags, user_notes"
+      reason: "PRD F-12; search must work on OCR alone with no AI (ADR-0009)"
+      decided_by: human
+
+  acceptance_criteria:
+    - "Inserting/updating/deleting a screenshot keeps `screenshots_fts` consistent (trigger test)"
+    - "Query returns BM25-ranked results; category/date/tag filters compose correctly"
+    - "`search_screenshots` command exposed via `src/api/index.ts`"
+    - "Search works on rows with NULL AI fields (OCR-only)"
+
+  acceptance_checks:
+    - command: "test -f src-tauri/migrations/002_fts.sql"
+      expect_exit: 0
+      description: "FTS migration present"
+    - command: "cargo test --manifest-path src-tauri/Cargo.toml search"
+      expect_exit: 0
+      description: "FTS sync + ranking tests pass"
+
+  criticality: high

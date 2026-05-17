@@ -1,0 +1,51 @@
+spec:
+  what: |
+    Store cloud provider API keys in the OS-native secure store (macOS
+    Keychain / Windows Credential Manager) via `tauri-plugin-store`. Keys are
+    write-only from the UI: entered once, masked thereafter, never echoed back
+    or written to any log. Non-secret provider settings stay in the regular
+    settings profile. `test_connection` reads the key from the keychain
+    without surfacing it to the frontend.
+
+  why: |
+    Screenshots and API keys are highly sensitive (real billing exposure). The
+    SQLite DB is intentionally user-inspectable and backupable, so storing keys
+    there or in a plaintext settings file would leak them. OS keychain gives
+    encryption and access control isolated from the DB and logs.
+
+  constraints:
+    - "API keys must NEVER be written to the SQLite DB or any settings file"
+    - "API keys must NEVER appear in logs or be returned to the frontend after entry"
+    - "Use tauri-plugin-store backed by OS keychain; provide a CI/headless fallback path"
+    - "Masked display only (e.g. sk-••••3f2a)"
+
+  context_files:
+    - .baton/docs/adr/0013-api-keys-in-os-keychain.md
+    - .baton/docs/adr/0010-pluggable-aiprovider-trait-byok.md
+    - .baton/docs/adr/0015-privacy-by-default.md
+    - .baton/skills/backend/conventions.md
+
+  writes_to:
+    - src-tauri/src/commands/settings.rs
+    - src-tauri/src/ai/mod.rs
+    - src-tauri/Cargo.toml
+    - src/api/index.ts
+
+  decisions:
+    - question: "Where are provider API keys stored?"
+      answer: "OS keychain (macOS Keychain / Windows Credential Manager) via tauri-plugin-store"
+      reason: "DB is user-inspectable/backupable; keychain isolates secrets (ADR-0013)"
+      decided_by: human
+
+  acceptance_criteria:
+    - "Saved key is retrievable for requests but never returned to the UI"
+    - "No key string appears in the DB, settings file, or logs (grep clean)"
+    - "UI shows only a masked representation after entry"
+    - "`test_connection` works using the keychain-stored key"
+
+  acceptance_checks:
+    - command: "cargo test --manifest-path src-tauri/Cargo.toml keychain"
+      expect_exit: 0
+      description: "Keychain store/retrieve + no-leak tests pass"
+
+  criticality: high

@@ -1,0 +1,54 @@
+spec:
+  what: |
+    Implement `src-tauri/src/watcher.rs` using the `notify` crate to subscribe
+    to OS-native filesystem events for a dynamic set of Watch Folders (add /
+    remove at runtime, max 20). Debounce events, confirm files are fully
+    written before emitting, and hand each created-file candidate to the
+    detection heuristic stage. Expose commands to add/remove/list watch folders.
+
+  why: |
+    Zero-friction ingestion (users never manually import) requires low-latency,
+    low-idle-CPU detection across macOS and Windows. Polling would burn CPU and
+    add lag; `notify` gives OS-native events (FSEvents / ReadDirectoryChangesW)
+    with one cross-platform API and runtime-mutable watch sets.
+
+  constraints:
+    - "Do NOT poll directories on an interval — use notify events"
+    - "Must debounce and verify full-write before ingesting (avoid partial files)"
+    - "Watch folder list is runtime-mutable; max 20 folders"
+    - "Watcher runs off the Tauri main thread; file work is async"
+
+  context_files:
+    - .baton/docs/adr/0006-notify-os-native-file-watching.md
+    - .baton/docs/adr/0007-heuristic-screenshot-detection.md
+    - .baton/skills/backend/conventions.md
+    - SnapSort_PRD.md
+
+  writes_to:
+    - src-tauri/src/watcher.rs
+    - src-tauri/src/commands/settings.rs
+    - src-tauri/src/lib.rs
+    - src/api/index.ts
+
+  decisions:
+    - question: "How are new screenshot files detected?"
+      answer: "The `notify` crate subscribing to OS-native filesystem events"
+      reason: "Near-real-time, negligible idle cost, one cross-platform API (ADR-0006)"
+      decided_by: human
+    - question: "How many watch folders are supported?"
+      answer: "Up to 20, added/removed at runtime"
+      reason: "PRD US-060/061"
+      decided_by: human
+
+  acceptance_criteria:
+    - "Creating a file in a watched folder emits exactly one debounced candidate"
+    - "Partially-written files are not ingested until complete"
+    - "Add/remove watch folder starts/stops watching immediately"
+    - "Add/remove/list watch folder commands exposed via `src/api/index.ts`"
+
+  acceptance_checks:
+    - command: "cargo test --manifest-path src-tauri/Cargo.toml watcher"
+      expect_exit: 0
+      description: "Watcher debounce + add/remove tests pass (temp dir)"
+
+  criticality: high
