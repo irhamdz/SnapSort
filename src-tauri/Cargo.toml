@@ -1,0 +1,26 @@
+[package]
+name = "snapsort"
+version = "0.1.0"
+description = "Offline-first desktop app for automatic screenshot detection and searchable library"
+authors = ["SnapSort Contributors"]
+edition = "2021"
+rust-version = "1.75"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+anyhow = "1.0"
+rusqlite = { version = "0.31", features = ["bundled", "vtab"] }
+tokio = { version = "1", features = ["full"] }
+notify-debouncer-full = "0.3"
+notify = "6"
+tracing = "0.1"
+dirs = "5"
+
+[features]
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]
