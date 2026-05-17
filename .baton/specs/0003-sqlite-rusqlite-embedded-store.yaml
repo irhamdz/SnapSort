@@ -1,0 +1,59 @@
+spec:
+  what: |
+    Implement the SQLite data layer: a `db::Database` wrapper over `rusqlite`,
+    a migration runner that applies `src-tauri/migrations/NNN_*.sql` in order
+    and tracks applied versions in a `schema_migrations` table, and migration
+    `001_initial.sql` creating the core `screenshots` table (filepath,
+    filename, dimensions, status, category, category_source, tags JSON,
+    ocr_text, summary, app_detected, is_archived, is_favorite, thumbnail BLOB,
+    timestamps). Wire `Database` into `AppState`.
+
+  why: |
+    SnapSort is offline-first with no server and no cloud sync, so all metadata
+    must live in a zero-setup embedded store on the user's machine. SQLite was
+    chosen for ACID batch transactions, built-in FTS5, and trivial backup. This
+    layer is the substrate for search, batch ops, and the ingestion pipeline.
+
+  constraints:
+    - "ALL SQL lives in `src-tauri/src/db/` — never inline SQL in commands"
+    - "Migrations are forward-only, numbered sequentially; never edit an applied migration"
+    - "`category_source` column must be constrained to `'ai'` or `'user'`"
+    - "Do NOT add a client/server DB or an ORM; raw rusqlite + repository pattern only"
+
+  context_files:
+    - .baton/docs/adr/0003-sqlite-rusqlite-embedded-store.md
+    - .baton/docs/adr/0012-fixed-category-taxonomy-provenance.md
+    - .baton/skills/backend/conventions.md
+    - CLAUDE.md
+
+  writes_to:
+    - src-tauri/src/db/mod.rs
+    - src-tauri/src/migrations.rs
+    - src-tauri/migrations/001_initial.sql
+    - src-tauri/src/lib.rs
+
+  decisions:
+    - question: "What is the persistence store?"
+      answer: "SQLite via rusqlite, repository layer in src-tauri/src/db/, numbered migrations"
+      reason: "Zero-setup embedded ACID store with FTS5; fits offline-first, no-sync design (ADR-0003)"
+      decided_by: human
+    - question: "How are schema changes managed?"
+      answer: "Forward-only numbered .sql migrations tracked in schema_migrations"
+      reason: "Deterministic startup migration; single-writer model (ADR-0003)"
+      decided_by: human
+
+  acceptance_criteria:
+    - "Database opens in the OS app-data dir via Tauri path API (no hard-coded path)"
+    - "Migration runner applies 001 and records it in schema_migrations; re-run is idempotent"
+    - "`screenshots` table matches the documented schema incl. `category_source` CHECK"
+    - "Repository methods (insert/get/list) exist; no SQL leaks into commands/"
+
+  acceptance_checks:
+    - command: "test -f src-tauri/migrations/001_initial.sql"
+      expect_exit: 0
+      description: "Initial migration present"
+    - command: "cargo test --manifest-path src-tauri/Cargo.toml db::"
+      expect_exit: 0
+      description: "DB layer + migration tests pass (in-memory rusqlite)"
+
+  criticality: high

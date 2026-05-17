@@ -1,0 +1,50 @@
+spec:
+  what: |
+    Integrate bundled Tesseract OCR. On ingestion (always, regardless of AI
+    config), run OCR on the screenshot, write the result to
+    `screenshots.ocr_text`, and advance the pipeline status to `ocr_complete`.
+    OCR runs async on a bounded worker/queue so bursts of new screenshots do
+    not starve the UI or watcher thread. Tesseract + language data are bundled
+    so the feature works fully offline.
+
+  why: |
+    OCR is the backbone of search and runs on every screenshot independent of
+    AI (a `ready` no-AI screenshot must still be searchable). It must be
+    offline and license-compatible with the MIT project, so a bundled
+    Tesseract was chosen over any cloud OCR API.
+
+  constraints:
+    - "OCR must never call the network"
+    - "OCR runs on EVERY screenshot, even with no AI provider configured"
+    - "Must be async/queued — never block the watcher or Tauri main thread"
+    - "Tesseract + traineddata must be bundled, not assumed preinstalled"
+
+  context_files:
+    - .baton/docs/adr/0008-bundled-tesseract-offline-ocr.md
+    - .baton/docs/adr/0011-ingestion-pipeline-state-machine.md
+    - .baton/docs/adr/0004-sqlite-fts5-full-text-search.md
+    - .baton/skills/backend/conventions.md
+
+  writes_to:
+    - src-tauri/src/commands/screenshots.rs
+    - src-tauri/src/db/mod.rs
+    - src-tauri/Cargo.toml
+
+  decisions:
+    - question: "What OCR engine is used and when does it run?"
+      answer: "Bundled Tesseract, run on every screenshot at ingestion, async"
+      reason: "Offline, MIT-compatible, decouples search from AI config (ADR-0008)"
+      decided_by: human
+
+  acceptance_criteria:
+    - "An ingested image with text yields non-empty `ocr_text` and status `ocr_complete`"
+    - "OCR runs with zero AI providers configured"
+    - "OCR work is queued/async; watcher thread stays responsive under a burst"
+    - "Resulting `ocr_text` is searchable via FTS5"
+
+  acceptance_checks:
+    - command: "cargo test --manifest-path src-tauri/Cargo.toml ocr"
+      expect_exit: 0
+      description: "OCR extraction + status transition tests pass"
+
+  criticality: high
