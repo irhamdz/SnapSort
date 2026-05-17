@@ -1,0 +1,54 @@
+spec:
+  what: |
+    Define the `AIProvider` trait in `src-tauri/src/ai/` and implement Ollama
+    (default, auto-detected at http://localhost:11434), an OpenAI-compatible
+    provider, and Anthropic — each behind the trait. Add settings to register
+    providers (BYOK), pick the active one, and a `test_connection` command. The
+    active provider only affects FUTURE analysis jobs; switching does not
+    retroactively re-analyze.
+
+  why: |
+    SnapSort explicitly rejects AI vendor lock-in: users choose local Ollama or
+    any cloud/compatible endpoint and switch anytime; contributors add a
+    provider by implementing one trait without touching pipeline code.
+
+  constraints:
+    - "All providers implement the single `AIProvider` trait — no special-casing in the pipeline"
+    - "Pipeline must function with zero providers (see spec 0009)"
+    - "Switching active provider must NOT retro-analyze existing screenshots"
+    - "API keys handled per spec 0013 (OS keychain) — never logged"
+
+  context_files:
+    - .baton/docs/adr/0010-pluggable-aiprovider-trait-byok.md
+    - .baton/docs/adr/0009-ai-optional-progressive-enhancement.md
+    - .baton/docs/adr/0013-api-keys-in-os-keychain.md
+    - .baton/skills/backend/conventions.md
+
+  writes_to:
+    - src-tauri/src/ai/mod.rs
+    - src-tauri/src/commands/ai.rs
+    - src-tauri/src/lib.rs
+    - src/api/index.ts
+
+  decisions:
+    - question: "How are AI providers integrated?"
+      answer: "A single `AIProvider` trait with Ollama/OpenAI-compat/Anthropic impls; BYOK"
+      reason: "No lock-in; additive contributor extension point (ADR-0010)"
+      decided_by: human
+    - question: "What is the default provider?"
+      answer: "Ollama, auto-detected at http://localhost:11434"
+      reason: "Local, private, free default (ADR-0010, PRD F-07)"
+      decided_by: human
+
+  acceptance_criteria:
+    - "`AIProvider` trait defined; three implementations compile behind it"
+    - "Ollama auto-detected when reachable; provider selectable as active"
+    - "`test_connection` reports success/failure per provider"
+    - "Changing active provider leaves existing rows' metadata untouched"
+
+  acceptance_checks:
+    - command: "cargo test --manifest-path src-tauri/Cargo.toml ai::"
+      expect_exit: 0
+      description: "Provider trait + selection tests pass"
+
+  criticality: medium

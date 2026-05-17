@@ -1,0 +1,51 @@
+spec:
+  what: |
+    Implement the ingestion pipeline as an explicit, persisted state machine on
+    `screenshots.status`: detected -> queued -> ocr_complete -> ready (no AI)
+    OR -> analyzing -> enriched; analyzing -> partial on AI failure
+    (retry-eligible); plus auxiliary `archived` and `deleted`. Drive
+    transitions from watcher → thumbnail → OCR → optional AI, persisting each
+    transition. Expose status counts for the UI ("Analyzing N…", Unanalyzed
+    smart folder, per-card spinners) and a retry command for `partial`.
+
+  why: |
+    Ingestion has independent async stages that can fail or stall. A persisted
+    state machine makes progress and retry durable across restarts/crashes, and
+    the branch after `ocr_complete` cleanly encodes the optional-AI principle
+    with `ready` as a fully usable terminal state.
+
+  constraints:
+    - "Status set must be exhaustive; no unhandled transition (no stuck rows)"
+    - "Each transition is a short DB transaction (single-writer contention)"
+    - "`ready` is terminal and fully usable — not a placeholder"
+    - "`partial` must be retry-eligible without losing OCR data"
+
+  context_files:
+    - .baton/docs/adr/0011-ingestion-pipeline-state-machine.md
+    - .baton/docs/adr/0009-ai-optional-progressive-enhancement.md
+    - .baton/skills/backend/conventions.md
+    - SnapSort_PRD.md
+
+  writes_to:
+    - src-tauri/src/commands/screenshots.rs
+    - src-tauri/src/db/mod.rs
+    - src/api/index.ts
+
+  decisions:
+    - question: "How is ingestion progress modeled?"
+      answer: "Persisted state machine on screenshots.status with a no-AI branch to `ready`"
+      reason: "Durable progress/retry; encodes optional-AI; PRD §2.4/§2.5 (ADR-0011)"
+      decided_by: human
+
+  acceptance_criteria:
+    - "No-AI path ends at `ready`; AI path ends at `enriched`"
+    - "AI failure yields `partial`; retry transitions partial → analyzing → enriched"
+    - "Status survives a simulated restart mid-pipeline"
+    - "Status-count query backs the 'Analyzing N' / Unanalyzed UI"
+
+  acceptance_checks:
+    - command: "cargo test --manifest-path src-tauri/Cargo.toml pipeline"
+      expect_exit: 0
+      description: "State transition + retry tests pass"
+
+  criticality: high

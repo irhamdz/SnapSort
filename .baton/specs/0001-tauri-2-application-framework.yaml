@@ -1,0 +1,60 @@
+spec:
+  what: |
+    Scaffold the SnapSort desktop application as a Tauri 2 project: a Rust
+    backend crate under `src-tauri/` exposing commands over Tauri IPC, plus a
+    web frontend entry that the Tauri window loads. Produce a buildable shell
+    with: `tauri::Builder` in `src-tauri/src/main.rs` + `lib.rs`, an `AppState`
+    placeholder, one health-check `#[command]`, and `tauri.conf.json` targeting
+    macOS 12+ and Windows 10 (1809+).
+
+  why: |
+    This is the foundational shell every other SnapSort feature is built on.
+    Tauri 2 was chosen over Electron for a ~10MB binary, low memory, and a
+    native Rust core for file watching, OCR, and SQLite — and over a dual
+    native codebase for single-UI cross-platform reach. Without this scaffold
+    no other spec can compile or run.
+
+  constraints:
+    - "Do NOT add Electron, a bundled Chromium, or a second native UI toolkit"
+    - "Do NOT put SQL, file I/O, or business logic in this scaffold — only the shell"
+    - "Do NOT block the Tauri main thread; reserve async/tokio wiring for later specs"
+    - "Module layout must match backend conventions (commands/, db/, ai/ stubs)"
+
+  context_files:
+    - .baton/docs/adr/0001-tauri-2-application-framework.md
+    - .baton/project-brief.md
+    - .baton/skills/backend/conventions.md
+    - CLAUDE.md
+
+  writes_to:
+    - src-tauri/Cargo.toml
+    - src-tauri/tauri.conf.json
+    - src-tauri/src/main.rs
+    - src-tauri/src/lib.rs
+
+  decisions:
+    - question: "What application framework should SnapSort use?"
+      answer: "Tauri 2 — Rust backend + OS-native WebView, typed IPC commands"
+      reason: "~10MB binary and low memory vs Electron; native Rust for watcher/OCR/SQLite; single UI codebase across macOS and Windows (ADR-0001)"
+      decided_by: human
+    - question: "Which OS versions must be supported?"
+      answer: "macOS 12+ (arm64 + x86_64), Windows 10 build 1809+ (x86_64)"
+      reason: "PRD §1.4 target platforms"
+      decided_by: human
+
+  acceptance_criteria:
+    - "`src-tauri/` is a valid Tauri 2 crate that builds with `cargo build`"
+    - "`tauri::Builder` runs, opens a window, and serves the frontend entry"
+    - "A trivial `#[command]` (e.g. `health_check`) is registered and invokable"
+    - "`tauri.conf.json` declares macOS 12 / Windows 10 1809 minimums"
+    - "Empty `commands/`, `db/`, `ai/` module stubs exist per backend conventions"
+
+  acceptance_checks:
+    - command: "test -f src-tauri/Cargo.toml && test -f src-tauri/tauri.conf.json"
+      expect_exit: 0
+      description: "Tauri project files exist"
+    - command: "cargo build --manifest-path src-tauri/Cargo.toml"
+      expect_exit: 0
+      description: "Backend crate compiles"
+
+  criticality: high
