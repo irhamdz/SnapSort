@@ -1,0 +1,51 @@
+spec:
+  what: |
+    Enforce "AI is optional" across the system. With zero providers configured,
+    a screenshot must reach the first-class `ready` state after OCR and be
+    fully usable: visible in the gallery, searchable, and eligible for ALL
+    batch operations. AI fields (category[ai], tags, summary, app_detected)
+    must be nullable everywhere and the UI must degrade gracefully
+    ("Uncategorized", no summary tooltip) rather than render broken/empty
+    states. Audit pipeline + UI to remove any AI-gating of core features.
+
+  why: |
+    PRD v1.1 made "AI optional" a core principle. Key personas (privacy-first,
+    casual, no-GPU) will never configure AI yet must get a fully functional
+    product. AI must only ADD metadata, never gate detection, OCR, search,
+    gallery, detail view, or batch ops.
+
+  constraints:
+    - "No core feature may hard-require a configured AI provider"
+    - "All AI-derived columns must be nullable; no NOT NULL on summary/app_detected/etc."
+    - "UI must not show empty/error states where AI data is simply absent"
+    - "`ready` is a terminal, fully-usable state — not a degraded placeholder"
+
+  context_files:
+    - .baton/docs/adr/0009-ai-optional-progressive-enhancement.md
+    - .baton/docs/adr/0011-ingestion-pipeline-state-machine.md
+    - .baton/docs/adr/0012-fixed-category-taxonomy-provenance.md
+    - SnapSort_PRD.md
+
+  writes_to:
+    - src-tauri/src/commands/screenshots.rs
+    - src/stores/galleryStore.ts
+    - src/api/index.ts
+
+  decisions:
+    - question: "Is AI required for SnapSort to be usable?"
+      answer: "No — AI is a progressive enhancement; all non-AI features work with no provider"
+      reason: "Core design principle; serves privacy-first/casual personas (ADR-0009, PRD §1.3)"
+      decided_by: human
+
+  acceptance_criteria:
+    - "With no provider: ingest → OCR → status `ready`; screenshot is searchable"
+    - "All batch operations work on `ready` screenshots"
+    - "Gallery/detail render cleanly with NULL category/summary/app/tags"
+    - "Grep shows no core path erroring when provider list is empty"
+
+  acceptance_checks:
+    - command: "cargo test --manifest-path src-tauri/Cargo.toml no_ai"
+      expect_exit: 0
+      description: "End-to-end no-provider usability tests pass"
+
+  criticality: high
