@@ -1,0 +1,50 @@
+spec:
+  what: |
+    Implement the screenshot detection heuristic that classifies each
+    watcher-emitted candidate file. A file qualifies only if it passes
+    rule 1 AND (2 OR 3 OR 4 OR 5): (1) extension in png/jpg/jpeg/webp;
+    (2) in a known default screenshot directory; (3) filename matches known
+    patterns (Screenshot*, Capture*, Screen Shot*, timestamp-only, etc.);
+    (4) created by a known screenshot process (macOS `com.apple.screencaptureui`;
+    Windows `SnippingTool.exe`, `ScreenClippingHost.exe`); (5) dimensions
+    >= 400x300. Non-matches are discarded; matches enter the pipeline.
+
+  why: |
+    Watch folders like ~/Desktop contain downloads, icons, and avatars. The app
+    must admit real screenshots and reject noise BEFORE and independently of any
+    AI, keeping ingestion cheap and fully local. The AND/OR structure tolerates
+    platform and capture-tool variation.
+
+  constraints:
+    - "Detection must be fully local — no AI, no network"
+    - "Exact rule logic: 1 AND (2 OR 3 OR 4 OR 5) — do not weaken to 1 AND any"
+    - "Heuristic must be cheap (no full image decode beyond reading dimensions)"
+    - "Pattern/process lists must be data, easy to extend"
+
+  context_files:
+    - .baton/docs/adr/0007-heuristic-screenshot-detection.md
+    - .baton/docs/adr/0006-notify-os-native-file-watching.md
+    - .baton/skills/backend/conventions.md
+    - SnapSort_PRD.md
+
+  writes_to:
+    - src-tauri/src/watcher.rs
+
+  decisions:
+    - question: "How is a file judged to be a screenshot?"
+      answer: "Ordered heuristics: ext-check AND (known dir OR filename pattern OR process meta OR >=400x300)"
+      reason: "Fast, local, no model; tolerates platform variation (ADR-0007, PRD F-01)"
+      decided_by: human
+
+  acceptance_criteria:
+    - "A real screenshot (matching name/dir/dims) is admitted"
+    - "A 100x100 downloaded PNG with a random name is rejected"
+    - "A .txt or .gif file is rejected on rule 1"
+    - "Unit tests cover each OR branch independently"
+
+  acceptance_checks:
+    - command: "cargo test --manifest-path src-tauri/Cargo.toml detect"
+      expect_exit: 0
+      description: "Detection heuristic branch tests pass"
+
+  criticality: high

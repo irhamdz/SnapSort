@@ -1,0 +1,52 @@
+spec:
+  what: |
+    Implement the closed 10-category taxonomy (code, design, document, web,
+    communication, media, finance, reference, system, other) as the only valid
+    category values, exactly one per screenshot, plus a `category_source`
+    field always set to `'ai'` or `'user'` (DB CHECK constraint, never NULL/
+    omitted). Provide a single-screenshot set-category command (source=`user`)
+    and ensure AI re-analysis does not silently overwrite a `user`-sourced
+    category without intent.
+
+  why: |
+    Categories drive filters, smart folders, rename tokens, and AI prompting.
+    Free-form categories would fragment the taxonomy and make AI prompting
+    unreliable. Provenance lets the system protect user intent (warn before
+    batch-overwrite, prevent AI clobbering a manual choice).
+
+  constraints:
+    - "Exactly the 10 system categories — no user-defined categories"
+    - "`category_source` is NOT NULL, CHECK in ('ai','user') — never omitted"
+    - "One category per screenshot (mutually exclusive)"
+    - "AI must not silently replace a `user`-sourced category"
+
+  context_files:
+    - .baton/docs/adr/0012-fixed-category-taxonomy-provenance.md
+    - .baton/docs/adr/0003-sqlite-rusqlite-embedded-store.md
+    - .baton/skills/backend/conventions.md
+    - SnapSort_PRD.md
+
+  writes_to:
+    - src-tauri/migrations/003_category_source.sql
+    - src-tauri/src/commands/screenshots.rs
+    - src-tauri/src/db/mod.rs
+    - src/api/index.ts
+
+  decisions:
+    - question: "Are categories fixed or user-defined, and is provenance tracked?"
+      answer: "Fixed 10-category taxonomy; provenance in category_source ('ai'|'user'), never omitted"
+      reason: "Stable filters + reliable AI target; protects user intent (ADR-0012, PRD §2.3)"
+      decided_by: human
+
+  acceptance_criteria:
+    - "Writing a category outside the 10 is rejected"
+    - "Every category write records `category_source`; constraint blocks NULL/other"
+    - "Manual set records source=`user`; AI set records source=`ai`"
+    - "AI re-analysis does not overwrite a user category without explicit intent"
+
+  acceptance_checks:
+    - command: "cargo test --manifest-path src-tauri/Cargo.toml category"
+      expect_exit: 0
+      description: "Taxonomy + provenance constraint tests pass"
+
+  criticality: medium

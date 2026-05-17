@@ -1,0 +1,55 @@
+spec:
+  what: |
+    Establish and enforce the typed IPC contract as the single frontend/backend
+    boundary. Every backend capability is a Tauri `#[command]` in
+    `src-tauri/src/commands/`, registered in the `tauri::Builder`; the frontend
+    consumes it ONLY through typed wrappers in `src/api/index.ts`
+    (component → store → api → command). Document the fixed feature recipe
+    (SQL/migration → db repo → command → builder registration → api wrapper →
+    store → component) and add a lint/CI check that fails on direct `invoke()`
+    in components or inline SQL in commands.
+
+  why: |
+    Tauri splits the app across Rust and React; every feature crosses that
+    seam. Ad-hoc `invoke()` calls would make the contract implicit, untyped,
+    and unsafe to evolve. One enumerable, typed surface keeps the boundary
+    reviewable and contributor-friendly.
+
+  constraints:
+    - "No direct `invoke()` outside `src/api/` — components never call it"
+    - "No inline SQL in `commands/` — all SQL in the `db/` repository layer"
+    - "TS API types must mirror the Rust command signatures"
+    - "Every new command must have a matching typed wrapper"
+
+  context_files:
+    - .baton/docs/adr/0017-typed-ipc-contract-single-boundary.md
+    - .baton/docs/adr/0001-tauri-2-application-framework.md
+    - .baton/skills/frontend/conventions.md
+    - CLAUDE.md
+
+  writes_to:
+    - src/api/index.ts
+    - src-tauri/src/lib.rs
+    - .baton/docs/ipc-contract.md
+
+  decisions:
+    - question: "How does the frontend talk to the backend?"
+      answer: "Typed wrappers in src/api/index.ts over registered #[command]s; no direct invoke()"
+      reason: "Single enumerable typed boundary; compile-time drift detection (ADR-0017)"
+      decided_by: human
+
+  acceptance_criteria:
+    - "All existing commands have typed wrappers in `src/api/index.ts`"
+    - "Grep finds no `invoke(` usage in `src/components/` or `src/stores/`"
+    - "Grep finds no raw SQL string in `src-tauri/src/commands/`"
+    - "`.baton/docs/ipc-contract.md` documents the end-to-end recipe"
+
+  acceptance_checks:
+    - command: "! grep -RIn \"invoke(\" src/components src/stores 2>/dev/null"
+      expect_exit: 0
+      description: "No direct invoke() outside the api layer"
+    - command: "npm run build"
+      expect_exit: 0
+      description: "Typed API layer type-checks"
+
+  criticality: medium
