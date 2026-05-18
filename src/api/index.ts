@@ -125,7 +125,35 @@ export async function searchWithFilters(filters: any): Promise<any[]> {
   return []
 }
 
-// AI commands
+// AI provider commands
+export interface ProviderInfo {
+  id: string
+  name: string
+  is_configured: boolean
+  is_active: boolean
+}
+
+export async function getProviders(): Promise<ProviderInfo[]> {
+  return invoke<ProviderInfo[]>('get_providers')
+}
+
+export async function addProvider(provider: { id: string; base_url: string; api_key: string; model: string }): Promise<void> {
+  return invoke('add_provider', { provider })
+}
+
+export async function removeProvider(id: string): Promise<void> {
+  return invoke('remove_provider', { id })
+}
+
+export async function testConnection(id: string): Promise<boolean> {
+  return invoke<boolean>('test_connection', { id })
+}
+
+export async function setActiveProvider(id: string): Promise<void> {
+  return invoke('set_active_provider', { id })
+}
+
+// AI analysis commands
 export async function runAIAnalysis(screenshotId: string): Promise<void> {
   // TODO: Implement
 }

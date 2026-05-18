@@ -38,6 +38,18 @@ trash = "3.0"
 # Directory paths
 dirs = "5.0"
 
+# HTTP client for AI providers
+reqwest = { version = "0.12", features = ["json", "multipart", "rustls-tls"], default-features = false }
+
+# Base64 encoding for API payloads
+base64 = "0.22"
+
+# Async trait for dynamic dispatch
+async-trait = "0.1"
+
+# OS keychain for sensitive credentials
+tauri-plugin-store = "2"
+
 [features]
 default = ["custom-protocol"]
 custom-protocol = ["tauri/custom-protocol"]

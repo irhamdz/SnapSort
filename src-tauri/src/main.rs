@@ -45,6 +45,11 @@ fn main() {
             snapsort::commands::remove_watch_folder,
             snapsort::commands::list_watch_folders,
             snapsort::commands::search_screenshots,
+            snapsort::commands::ai::get_providers,
+            snapsort::commands::ai::add_provider,
+            snapsort::commands::ai::remove_provider,
+            snapsort::commands::ai::test_connection,
+            snapsort::commands::ai::set_active_provider,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

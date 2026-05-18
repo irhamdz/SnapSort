@@ -1,3 +1,5 @@
+pub mod ai;
+
 use anyhow::Result;
 use std::path::PathBuf;
 use tauri::State;
