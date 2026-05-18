@@ -2,17 +2,31 @@
 pub mod commands;
 pub mod db;
 pub mod ai;
+pub mod ocr;
 pub mod watcher;
 
-// State manager for database access
+use std::sync::Arc;
+
+pub struct WatchState {
+    pub watched_folders: Vec<String>,
+    pub max_folders: usize,
+}
+
 pub struct AppState {
     pub db: db::Database,
+    pub watch_state: Arc<std::sync::Mutex<WatchState>>,
+    pub watcher: Arc<tokio::sync::Mutex<Option<watcher::FileWatcher>>>,
 }
 
 impl AppState {
-    pub fn new() -> Self {
+    pub fn new(db: db::Database) -> Self {
         Self {
-            db: db::Database::new().expect("Failed to initialize database"),
+            db,
+            watch_state: Arc::new(std::sync::Mutex::new(WatchState {
+                watched_folders: Vec::new(),
+                max_folders: 10,
+            })),
+            watcher: Arc::new(tokio::sync::Mutex::new(None)),
         }
     }
 }

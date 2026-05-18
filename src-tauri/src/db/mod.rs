@@ -67,15 +67,25 @@ impl Database {
 
 /// Run all pending migrations
     fn run_migrations(conn: &Connection) -> Result<()> {
+        // Bootstrap: ensure schema_migrations exists before any queries touch it
+        conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS schema_migrations (
+                version INTEGER PRIMARY KEY,
+                applied_at TEXT NOT NULL DEFAULT (datetime('now'))
+            );"
+        ).context("Failed to create schema_migrations table")?;
+
         // Get the version of the last applied migration
         let current_version: Option<i64> = conn
             .query_row("SELECT MAX(version) FROM schema_migrations", [], |row| row.get(0))
             .ok();
 
-        eprintln!("Current version from schema_migrations: {:?}", current_version);
+        // Locate migrations directory relative to the crate root (works in tests and prod)
+        let migrations_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("migrations");
 
         // Read and apply migrations in order
-        let mut migration_files: Vec<_> = std::fs::read_dir("migrations/")
+        let mut migration_files: Vec<_> = std::fs::read_dir(&migrations_dir)
             .context("Failed to read migrations directory")?
             .filter_map(|e| e.ok())
             .collect::<Vec<_>>();
@@ -147,12 +157,12 @@ pub struct Screenshot {
     pub width: i32,
     pub height: i32,
     pub status: String,
-    pub category: String,
+    pub category: Option<String>,
     pub category_source: String,
     pub tags: Vec<String>,
     pub ocr_text: Option<String>,
     pub summary: Option<String>,
-    pub app_detected: i32,
+    pub app_detected: Option<String>,
     pub user_notes: Option<String>,
     pub is_archived: i32,
     pub is_favorite: i32,
@@ -191,12 +201,12 @@ impl Database {
         width: i32,
         height: i32,
         status: &str,
-        category: &str,
+        category: Option<&str>,
         category_source: &str,
         tags: Vec<String>,
         ocr_text: Option<String>,
         summary: Option<String>,
-        app_detected: i32,
+        app_detected: Option<String>,
         is_archived: i32,
         is_favorite: i32,
         thumbnail: Option<Vec<u8>>,
@@ -349,7 +359,7 @@ let rows = stmt.query_map(
         tags: Option<Vec<String>>,
         ocr_text: Option<String>,
         summary: Option<String>,
-        app_detected: Option<i32>,
+        app_detected: Option<String>,
         is_archived: Option<i32>,
         is_favorite: Option<i32>,
         thumbnail: Option<Vec<u8>>,
@@ -587,12 +597,12 @@ mod tests {
             800,
             600,
             "analyzed",
-            "code",
+            Some("code"),
             "user",
             vec!["rust".to_string(), "ui".to_string()],
             Some("OCR text here".to_string()),
             Some("Summary here".to_string()),
-            1,
+            None,
             0,
             0,
             None,
@@ -601,7 +611,7 @@ mod tests {
         let screenshot = db.get_screenshot(id).unwrap().unwrap();
         assert_eq!(screenshot.id, id);
         assert_eq!(screenshot.filepath, "/test/path.png");
-        assert_eq!(screenshot.category, "code");
+        assert_eq!(screenshot.category, Some("code".to_string()));
         assert_eq!(screenshot.category_source, "user");
         assert_eq!(screenshot.tags, vec!["rust".to_string(), "ui".to_string()]);
     }
@@ -618,12 +628,12 @@ mod tests {
                 800 + i,
                 600 + i,
                 "analyzed",
-                "code",
+                Some("code"),
                 "user",
                 vec![],
                 None,
                 None,
-                1,
+                None,
                 0,
                 0,
                 None,
@@ -644,12 +654,12 @@ mod tests {
             800,
             600,
             "analyzed",
-            "code",
+            Some("code"),
             "user",
             vec![],
             None,
             None,
-            1,
+            None,
             0,
             0,
             None,
@@ -660,7 +670,7 @@ mod tests {
 
         let screenshot = db.get_screenshot(id).unwrap();
         assert!(screenshot.is_none());
-        
+
         // Force a query to verify FTS5 tables are in sync
         let _ = db.list_screenshots(Some(1), Some(0));
     }
@@ -675,12 +685,12 @@ mod tests {
             800,
             600,
             "analyzed",
-            "code",
+            Some("code"),
             "user",
             vec![],
             None,
             None,
-            1,
+            None,
             0,
             0,
             None,
@@ -698,7 +708,7 @@ mod tests {
             Some(vec!["ui".to_string(), "ux".to_string()]),
             Some("New OCR text".to_string()),
             Some("New summary".to_string()),
-            Some(0),
+            Some("Terminal".to_string()),
             Some(1),
             Some(1),
             None,
@@ -712,12 +722,12 @@ mod tests {
         assert_eq!(screenshot.width, 1024);
         assert_eq!(screenshot.height, 768);
         assert_eq!(screenshot.status, "ocr_complete");
-        assert_eq!(screenshot.category, "design");
+        assert_eq!(screenshot.category, Some("design".to_string()));
         assert_eq!(screenshot.category_source, "ai");
         assert_eq!(screenshot.tags, vec!["ui".to_string(), "ux".to_string()]);
         assert_eq!(screenshot.ocr_text, Some("New OCR text".to_string()));
         assert_eq!(screenshot.summary, Some("New summary".to_string()));
-        assert_eq!(screenshot.app_detected, 0);
+        assert_eq!(screenshot.app_detected, Some("Terminal".to_string()));
         assert_eq!(screenshot.is_archived, 1);
         assert_eq!(screenshot.is_favorite, 1);
     }
@@ -728,13 +738,13 @@ mod tests {
 
         db.insert_screenshot(
             "/s/python_ml.png", "python_ml.png", 1920, 1080, "analyzed",
-            "code", "ai", vec![], Some("python machine learning code".to_string()),
-            None, 0, 0, 0, None,
+            Some("code"), "ai", vec![], Some("python machine learning code".to_string()),
+            None, None, 0, 0, None,
         ).unwrap();
         db.insert_screenshot(
             "/s/design.png", "design.png", 1920, 1080, "analyzed",
-            "design", "ai", vec![], Some("figma wireframe design".to_string()),
-            None, 0, 0, 0, None,
+            Some("design"), "ai", vec![], Some("figma wireframe design".to_string()),
+            None, None, 0, 0, None,
         ).unwrap();
 
         let results = db.search_screenshots(SearchFilters {
@@ -753,13 +763,13 @@ mod tests {
 
         db.insert_screenshot(
             "/s/code.png", "code.png", 100, 100, "analyzed",
-            "code", "ai", vec![], Some("rust programming language".to_string()),
-            None, 0, 0, 0, None,
+            Some("code"), "ai", vec![], Some("rust programming language".to_string()),
+            None, None, 0, 0, None,
         ).unwrap();
         db.insert_screenshot(
             "/s/web.png", "web.png", 100, 100, "analyzed",
-            "web", "ai", vec![], Some("rust web framework".to_string()),
-            None, 0, 0, 0, None,
+            Some("web"), "ai", vec![], Some("rust web framework".to_string()),
+            None, None, 0, 0, None,
         ).unwrap();
 
         let results = db.search_screenshots(SearchFilters {
@@ -770,7 +780,7 @@ mod tests {
         }).unwrap();
 
         assert_eq!(results.len(), 1);
-        assert_eq!(results[0].category, "code");
+        assert_eq!(results[0].category, Some("code".to_string()));
     }
 
     #[test]
@@ -779,9 +789,9 @@ mod tests {
 
         // OCR-only screenshot: no summary, only ocr_text
         db.insert_screenshot(
-            "/s/ocr_only.png", "ocr_only.png", 800, 600, "ocr_complete",
-            "document", "ai", vec![], Some("scanned invoice total amount".to_string()),
-            None, 0, 0, 0, None,
+            "/s/ocr_only.png", "ocr_only.png", 800, 600, "ready",
+            Some("document"), "ai", vec![], Some("scanned invoice total amount".to_string()),
+            None, None, 0, 0, None,
         ).unwrap();
 
         let results = db.search_screenshots(SearchFilters {
@@ -801,8 +811,8 @@ mod tests {
 
         let id = db.insert_screenshot(
             "/s/trigger.png", "trigger.png", 100, 100, "analyzed",
-            "code", "ai", vec![], Some("original text before update".to_string()),
-            None, 0, 0, 0, None,
+            Some("code"), "ai", vec![], Some("original text before update".to_string()),
+            None, None, 0, 0, None,
         ).unwrap();
 
         // Update should keep FTS in sync

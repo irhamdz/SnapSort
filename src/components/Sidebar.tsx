@@ -9,7 +9,6 @@ export function Sidebar() {
         <div className="text-xs font-semibold text-muted-foreground uppercase">Library</div>
         <a href="#" className="block px-3 py-2 rounded-md hover:bg-accent">All Screenshots</a>
         <a href="#" className="block px-3 py-2 rounded-md hover:bg-accent">Favorites</a>
-        <a href="#" className="block px-3 py-2 rounded-md hover:bg-accent">Unanalyzed</a>
       </nav>
 
       <nav className="space-y-1">

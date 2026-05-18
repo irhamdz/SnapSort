@@ -42,7 +42,7 @@ pub async fn add_watch_folder(
         let mut guard = watcher_arc.lock().await;
         if let Some(w) = guard.as_mut() {
             if let Err(e) = w.reinitialize().await {
-                tracing::error!("Failed to reinitialize watcher: {}", e);
+                eprintln!("Failed to reinitialize watcher: {}", e);
             }
         }
     });
@@ -72,7 +72,7 @@ pub async fn remove_watch_folder(
         let mut guard = watcher_arc.lock().await;
         if let Some(w) = guard.as_mut() {
             if let Err(e) = w.reinitialize().await {
-                tracing::error!("Failed to reinitialize watcher: {}", e);
+                eprintln!("Failed to reinitialize watcher: {}", e);
             }
         }
     });

@@ -11,6 +11,6 @@ describe('App Component', () => {
   it('has expected basic structure', () => {
     render(<App />);
     const appElement = screen.getByText('SnapSort').closest('div');
-    expect(appElement).toHaveClass('min-h-screen', 'bg-gray-100');
+    expect(appElement).toHaveClass('min-h-screen', 'bg-gray-950', 'text-white', 'p-8');
   });
 });

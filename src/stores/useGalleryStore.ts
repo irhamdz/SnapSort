@@ -5,12 +5,12 @@ export interface Screenshot {
   filepath: string
   width: number
   height: number
-  status: 'detected' | 'queued' | 'ocr_complete' | 'analyzed'
-  category: string
+  status: 'detected' | 'queued' | 'ocr_complete' | 'ready' | 'analyzing' | 'enriched' | 'partial' | 'archived' | 'deleted'
+  category: string | null
   category_source: 'ai' | 'user'
   tags: string[]
-  ocr_text: string
-  summary: string
+  ocr_text: string | null
+  summary: string | null
   thumbnail: string | null
   created_at: string
   updated_at: string

@@ -34,12 +34,14 @@ pub fn run_ocr(path: &Path) -> Result<OcrResult> {
     Ok(OcrResult { text })
 }
 
-/// Write OCR text into the database and advance status to `ocr_complete`.
+/// Write OCR text into the database and advance status to `ready`.
+/// `ready` is the terminal usable state when no AI provider is configured;
+/// AI enrichment (if configured) will further advance to `analyzed`.
 pub fn apply_ocr_result(db: &Database, id: i64, ocr_text: String) -> Result<()> {
     db.update_screenshot(
         id,
         None, None, None, None,
-        Some("ocr_complete"),
+        Some("ready"),
         None, None, None,
         Some(ocr_text),
         None, None, None, None, None,
@@ -71,19 +73,19 @@ mod tests {
     fn insert_detected(db: &Database) -> i64 {
         db.insert_screenshot(
             "/ocr/shot.png", "shot.png", 1920, 1080, "detected",
-            "other", "ai", vec![], None, None, 0, 0, 0, None,
+            Some("other"), "ai", vec![], None, None, None, 0, 0, None,
         ).unwrap()
     }
 
     #[test]
-    fn test_ocr_apply_result_sets_status_ocr_complete() {
+    fn test_ocr_apply_result_sets_status_ready() {
         let db = test_db();
         let id = insert_detected(&db);
 
         apply_ocr_result(&db, id, "hello world".to_string()).unwrap();
 
         let shot = db.get_screenshot(id).unwrap().unwrap();
-        assert_eq!(shot.status, "ocr_complete");
+        assert_eq!(shot.status, "ready");
         assert_eq!(shot.ocr_text, Some("hello world".to_string()));
     }
 
@@ -96,7 +98,7 @@ mod tests {
         apply_ocr_result(&db, id, String::new()).unwrap();
 
         let shot = db.get_screenshot(id).unwrap().unwrap();
-        assert_eq!(shot.status, "ocr_complete");
+        assert_eq!(shot.status, "ready");
     }
 
     #[test]
@@ -108,7 +110,7 @@ mod tests {
         apply_ocr_result(&db, id, "invoice total 42".to_string()).unwrap();
 
         let shot = db.get_screenshot(id).unwrap().unwrap();
-        assert_eq!(shot.status, "ocr_complete");
+        assert_eq!(shot.status, "ready");
         assert!(shot.ocr_text.as_deref().unwrap().contains("invoice"));
     }
 
