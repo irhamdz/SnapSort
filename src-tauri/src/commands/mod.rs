@@ -1,9 +1,10 @@
 pub mod ai;
 
 use anyhow::Result;
+use std::collections::HashMap;
 use std::path::PathBuf;
 use tauri::State;
-use crate::db::{SearchFilters, Screenshot as DbScreenshot};
+use crate::db::Screenshot as DbScreenshot;
 
 /// Health check command
 #[tauri::command]
@@ -115,5 +116,24 @@ pub fn search_screenshots(
     };
 
     state.db.search_screenshots(filters)
+        .map_err(|e| e.to_string())
+}
+
+/// Get status counts for all screenshots
+#[tauri::command]
+pub fn get_status_counts(
+    state: State<'_, crate::AppState>,
+) -> Result<HashMap<String, i64>, String> {
+    crate::pipeline::get_status_counts(&state.db)
+        .map_err(|e| e.to_string())
+}
+
+/// Retry a failed AI analysis on a screenshot
+#[tauri::command]
+pub fn retry_partial_analysis(
+    id: i64,
+    state: State<'_, crate::AppState>,
+) -> Result<(), String> {
+    crate::pipeline::retry_partial_analysis(&state.db, id)
         .map_err(|e| e.to_string())
 }

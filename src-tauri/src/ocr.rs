@@ -34,14 +34,16 @@ pub fn run_ocr(path: &Path) -> Result<OcrResult> {
     Ok(OcrResult { text })
 }
 
-/// Write OCR text into the database and advance status to `ready`.
-/// `ready` is the terminal usable state when no AI provider is configured;
-/// AI enrichment (if configured) will further advance to `analyzed`.
+/// Write OCR text into the database and advance status to `ocr_complete`.
+///
+/// `ocr_complete` is an intermediate state. The pipeline then decides:
+/// - If no AI provider is configured → transition to `ready` (terminal, fully usable)
+/// - If AI provider is configured → transition to `analyzing` (AI job in progress)
 pub fn apply_ocr_result(db: &Database, id: i64, ocr_text: String) -> Result<()> {
     db.update_screenshot(
         id,
         None, None, None, None,
-        Some("ready"),
+        Some("ocr_complete"),
         None, None, None,
         Some(ocr_text),
         None, None, None, None, None,

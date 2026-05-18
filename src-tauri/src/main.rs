@@ -45,6 +45,8 @@ fn main() {
             snapsort::commands::remove_watch_folder,
             snapsort::commands::list_watch_folders,
             snapsort::commands::search_screenshots,
+            snapsort::commands::get_status_counts,
+            snapsort::commands::retry_partial_analysis,
             snapsort::commands::ai::get_providers,
             snapsort::commands::ai::add_provider,
             snapsort::commands::ai::remove_provider,

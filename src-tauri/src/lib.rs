@@ -4,6 +4,8 @@ pub mod db;
 pub mod ai;
 pub mod ocr;
 pub mod watcher;
+pub mod pipeline;
+pub mod thumbnail;
 
 use std::sync::Arc;
 

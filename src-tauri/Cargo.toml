@@ -38,6 +38,9 @@ trash = "3.0"
 # Directory paths
 dirs = "5.0"
 
+# Image processing for thumbnail generation
+image = "0.25"
+
 # HTTP client for AI providers
 reqwest = { version = "0.12", features = ["json", "multipart", "rustls-tls"], default-features = false }
 
@@ -49,6 +52,9 @@ async-trait = "0.1"
 
 # OS keychain for sensitive credentials
 tauri-plugin-store = "2"
+
+# Logging for errors and warnings
+tracing = "0.1"
 
 [features]
 default = ["custom-protocol"]

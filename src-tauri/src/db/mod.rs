@@ -440,6 +440,14 @@ let rows = stmt.query_map(
         Ok(result)
     }
 
+    /// Get a reference to the database connection (for advanced queries)
+    ///
+    /// This is a public accessor for the private `conn` field.
+    /// Most code should use the typed methods on Database instead.
+    pub fn get_connection(&self) -> &Mutex<Connection> {
+        &self.conn
+    }
+
     /// Search screenshots using full-text search with BM25 ranking
     ///
     /// Search covers: summary, OCR text, category, app name, tags, and user notes
@@ -558,6 +566,84 @@ let rows = stmt.query_map(
             screenshots.push(row.context("Failed to get search result row"));
         }
         let screenshots: Vec<Screenshot> = screenshots.into_iter().collect::<Result<Vec<_>, _>>()?;
+
+        Ok(screenshots)
+    }
+
+    /// Get status counts for all screenshots
+    ///
+    /// Returns a map of status name to count.
+    /// This backs the 'Analyzing N' and 'Unanalyzed' smart folder UI.
+    pub fn get_status_counts(&self) -> Result<std::collections::HashMap<String, i64>> {
+        let conn = self.conn.lock().unwrap();
+
+        let mut stmt = conn.prepare(
+            "SELECT status, COUNT(*) as count FROM screenshots GROUP BY status"
+        )?;
+
+        let mut counts = std::collections::HashMap::new();
+        let rows = stmt.query_map([], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?))
+        })?;
+
+        for row in rows {
+            let (status, count) = row?;
+            counts.insert(status, count);
+        }
+
+        Ok(counts)
+    }
+
+    /// List screenshots by status
+    ///
+    /// Useful for the "Unanalyzed" smart folder and batch operations.
+    pub fn list_by_status(&self, status: &str, limit: Option<usize>, offset: Option<usize>) -> Result<Vec<Screenshot>> {
+        let conn = self.conn.lock().unwrap();
+
+        let mut query = format!(
+            "SELECT id, filepath, filename, width, height, status, category, category_source, tags, ocr_text, summary, app_detected, user_notes, is_archived, is_favorite, thumbnail, created_at, updated_at FROM screenshots WHERE status = ?"
+        );
+
+        let mut params: Vec<Box<dyn rusqlite::ToSql>> = vec![Box::new(status)];
+
+        if limit.is_some() || offset.is_some() {
+            query.push_str(" LIMIT ? OFFSET ?");
+            params.push(Box::new(limit.unwrap_or(100)));
+            params.push(Box::new(offset.unwrap_or(0)));
+        }
+
+        let mut stmt = conn.prepare(&query)?;
+
+        let mut screenshots = Vec::new();
+        let rows = stmt.query_map(params_from_iter(params), |row| {
+            Ok(Screenshot {
+                id: row.get(0)?,
+                filepath: row.get(1)?,
+                filename: row.get(2)?,
+                width: row.get(3)?,
+                height: row.get(4)?,
+                status: row.get(5)?,
+                category: row.get(6)?,
+                category_source: row.get(7)?,
+                tags: {
+                    let tags_str = row.get::<_, String>(8)?;
+                    serde_json::from_str(&tags_str).unwrap_or_default()
+                },
+                ocr_text: row.get(9)?,
+                summary: row.get(10)?,
+                app_detected: row.get(11)?,
+                user_notes: row.get(12)?,
+                is_archived: row.get(13)?,
+                is_favorite: row.get(14)?,
+                thumbnail: row.get(15)?,
+                created_at: row.get(16)?,
+                updated_at: row.get(17)?,
+            })
+        })?;
+
+        for row in rows {
+            screenshots.push(row?);
+        }
 
         Ok(screenshots)
     }
