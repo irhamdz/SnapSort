@@ -2,6 +2,7 @@
 pub mod commands;
 pub mod db;
 pub mod ai;
+pub mod keychain;
 pub mod ocr;
 pub mod watcher;
 pub mod pipeline;

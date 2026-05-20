@@ -72,6 +72,8 @@ impl ProviderRegistry {
                 name: p.name().to_string(),
                 is_configured: p.is_configured(),
                 is_active: p.is_active(),
+                has_key: false,
+                key_suffix: None,
             })
             .collect()
     }
@@ -89,6 +91,8 @@ pub struct ProviderInfo {
     pub name: String,
     pub is_configured: bool,
     pub is_active: bool,
+    pub has_key: bool,
+    pub key_suffix: Option<String>,
 }
 
 // --- Ollama Provider (local, default) ---

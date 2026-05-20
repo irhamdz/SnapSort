@@ -6,6 +6,7 @@ use tauri::Manager;
 
 fn main() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_store::Builder::default().build())
         .setup(|app| {
             let app_data_dir = app
                 .path()
@@ -52,6 +53,9 @@ fn main() {
             snapsort::commands::ai::remove_provider,
             snapsort::commands::ai::test_connection,
             snapsort::commands::ai::set_active_provider,
+            snapsort::commands::ai::set_api_key,
+            snapsort::commands::ai::has_api_key,
+            snapsort::commands::ai::delete_api_key,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

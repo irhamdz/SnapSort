@@ -649,6 +649,106 @@ let rows = stmt.query_map(
     }
 }
 
+/// Non-secret provider configuration row
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct ProviderSettings {
+    pub provider_id: String,
+    pub display_name: String,
+    pub base_url: String,
+    pub model: String,
+    pub is_active: bool,
+    pub key_suffix: Option<String>,
+}
+
+impl Database {
+    pub fn list_provider_settings(&self) -> Result<Vec<ProviderSettings>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT provider_id, display_name, base_url, model, is_active, key_suffix \
+             FROM provider_settings ORDER BY created_at"
+        )?;
+        let rows = stmt.query_map([], |row| {
+            Ok(ProviderSettings {
+                provider_id: row.get(0)?,
+                display_name: row.get(1)?,
+                base_url: row.get(2)?,
+                model: row.get(3)?,
+                is_active: row.get::<_, i32>(4)? != 0,
+                key_suffix: row.get(5)?,
+            })
+        })?;
+        rows.map(|r| r.context("Failed to read provider_settings row"))
+            .collect()
+    }
+
+    pub fn get_provider_settings(&self, provider_id: &str) -> Result<Option<ProviderSettings>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT provider_id, display_name, base_url, model, is_active, key_suffix \
+             FROM provider_settings WHERE provider_id = ?"
+        )?;
+        let row = stmt
+            .query_row(params![provider_id], |row| {
+                Ok(ProviderSettings {
+                    provider_id: row.get(0)?,
+                    display_name: row.get(1)?,
+                    base_url: row.get(2)?,
+                    model: row.get(3)?,
+                    is_active: row.get::<_, i32>(4)? != 0,
+                    key_suffix: row.get(5)?,
+                })
+            })
+            .optional()
+            .context("Failed to get provider_settings")?;
+        Ok(row)
+    }
+
+    pub fn upsert_provider_settings(
+        &self,
+        provider_id: &str,
+        display_name: &str,
+        base_url: &str,
+        model: &str,
+        is_active: bool,
+    ) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "INSERT INTO provider_settings (provider_id, display_name, base_url, model, is_active) \
+             VALUES (?, ?, ?, ?, ?) \
+             ON CONFLICT(provider_id) DO UPDATE SET \
+               display_name = excluded.display_name, \
+               base_url = excluded.base_url, \
+               model = excluded.model, \
+               is_active = excluded.is_active, \
+               updated_at = datetime('now')",
+            params![provider_id, display_name, base_url, model, is_active as i32],
+        )
+        .context("Failed to upsert provider_settings")?;
+        Ok(())
+    }
+
+    pub fn delete_provider_settings(&self, provider_id: &str) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "DELETE FROM provider_settings WHERE provider_id = ?",
+            params![provider_id],
+        )
+        .context("Failed to delete provider_settings")?;
+        Ok(())
+    }
+
+    pub fn update_key_suffix(&self, provider_id: &str, key_suffix: Option<&str>) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "UPDATE provider_settings SET key_suffix = ?, updated_at = datetime('now') \
+             WHERE provider_id = ?",
+            params![key_suffix, provider_id],
+        )
+        .context("Failed to update key_suffix")?;
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
