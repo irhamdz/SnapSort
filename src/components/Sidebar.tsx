@@ -1,5 +1,3 @@
-import React from 'react'
-
 export function Sidebar() {
   return (
     <div className="w-64 border-r bg-card p-4 flex flex-col gap-6">

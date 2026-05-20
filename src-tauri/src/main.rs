@@ -56,6 +56,19 @@ fn main() {
             snapsort::commands::ai::set_api_key,
             snapsort::commands::ai::has_api_key,
             snapsort::commands::ai::delete_api_key,
+            // Batch operations
+            snapsort::commands::batch_delete,
+            snapsort::commands::batch_categorize,
+            snapsort::commands::batch_rename,
+            snapsort::commands::batch_tag,
+            snapsort::commands::batch_archive,
+            snapsort::commands::batch_move,
+            snapsort::commands::batch_add_to_collection,
+            // Collections
+            snapsort::commands::get_collections,
+            snapsort::commands::create_collection,
+            snapsort::commands::add_to_collection,
+            snapsort::commands::remove_from_collection,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

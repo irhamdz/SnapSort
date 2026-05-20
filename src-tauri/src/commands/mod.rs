@@ -1,4 +1,23 @@
 pub mod ai;
+pub mod batch_commands;
+pub mod collection_commands;
+pub mod file_operations_commands;
+pub mod notifications;
+pub mod ocr_commands;
+pub mod settings;
+pub mod smart_folder_commands;
+pub mod tag_commands;
+
+// Re-export commands from submodules
+pub use ai::*;
+pub use batch_commands::*;
+pub use collection_commands::*;
+pub use file_operations_commands::*;
+pub use notifications::*;
+pub use ocr_commands::*;
+pub use settings::*;
+pub use smart_folder_commands::*;
+pub use tag_commands::*;
 
 use anyhow::Result;
 use std::collections::HashMap;

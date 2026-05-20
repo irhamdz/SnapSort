@@ -83,7 +83,7 @@ export const useGalleryStore = create<GalleryState & GalleryActions>((set) => ({
       ),
     })),
 
-  delete: async (id) => {
+  delete: async (_id) => {
     // TODO: Implement
   },
 }))

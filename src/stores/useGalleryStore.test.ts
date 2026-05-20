@@ -41,6 +41,7 @@ describe('useGalleryStore', () => {
       result.current.addScreenshot({
         id: '1',
         filepath: '/path/1.png',
+        filename: 'image1.png',
         width: 1920,
         height: 1080,
         status: 'detected',
@@ -59,6 +60,7 @@ describe('useGalleryStore', () => {
       result.current.addScreenshot({
         id: '2',
         filepath: '/path/2.png',
+        filename: 'image2.png',
         width: 1920,
         height: 1080,
         status: 'detected',

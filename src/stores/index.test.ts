@@ -20,6 +20,7 @@ describe('useGalleryStore', () => {
       {
         id: '1',
         filepath: '/path/to/image.png',
+        filename: 'image.png',
         width: 1920,
         height: 1080,
         status: 'detected',
@@ -45,6 +46,7 @@ describe('useGalleryStore', () => {
     useGalleryStore.getState().addScreenshot({
       id: '1',
       filepath: '/path/to/image.png',
+        filename: 'image.png',
       width: 1920,
       height: 1080,
       status: 'detected',
@@ -66,6 +68,7 @@ describe('useGalleryStore', () => {
     useGalleryStore.getState().addScreenshot({
       id: '1',
       filepath: '/path/to/image.png',
+        filename: 'image.png',
       width: 1920,
       height: 1080,
       status: 'detected',
@@ -89,6 +92,7 @@ describe('useGalleryStore', () => {
     useGalleryStore.getState().addScreenshot({
       id: '1',
       filepath: '/path/to/image.png',
+        filename: 'image.png',
       width: 1920,
       height: 1080,
       status: 'detected',

@@ -4215,6 +4215,7 @@ dependencies = [
  "tokio",
  "tracing",
  "trash",
+ "uuid",
 ]
 
 [[package]]

@@ -647,6 +647,386 @@ let rows = stmt.query_map(
 
         Ok(screenshots)
     }
+
+    // ============================================================================
+    // Batch operations
+    // ============================================================================
+
+    /// Batch categorize screenshots in a single transaction
+    pub fn batch_categorize(
+        &self,
+        screenshot_ids: Vec<i64>,
+        category: &str,
+        category_source: &str,
+    ) -> Result<()> {
+        let mut conn = self.conn.lock().unwrap();
+        let mut tx = conn.transaction().context("Failed to start batch categorize transaction")?;
+
+        for id in &screenshot_ids {
+            tx.execute(
+                "UPDATE screenshots SET category = ?, category_source = ? WHERE id = ?",
+                params![category, category_source, id],
+            )
+            .context("Failed to categorize screenshot")?;
+        }
+
+        tx.commit()
+            .context("Failed to commit batch categorize transaction")?;
+        Ok(())
+    }
+
+    /// Batch tag screenshots in a single transaction
+    pub fn batch_tag(
+        &self,
+        screenshot_ids: Vec<i64>,
+        tags: Vec<String>,
+        add: bool,
+    ) -> Result<()> {
+        let mut conn = self.conn.lock().unwrap();
+        let mut tx = conn.transaction().context("Failed to start batch tag transaction")?;
+
+        for id in &screenshot_ids {
+            let current_tags: Option<Vec<String>> = match tx
+                .query_row(
+                    "SELECT tags FROM screenshots WHERE id = ?",
+                    params![id],
+                    |row| {
+                        let tags_str: String = row.get(0)?;
+                        let tags: Vec<String> = serde_json::from_str(&tags_str).unwrap_or_default();
+                        Ok(tags)
+                    },
+                ) {
+                Ok(tags) => Some(tags),
+                Err(_) => None,
+            };
+
+            let mut new_tags = if let Some(current_tags) = current_tags {
+                current_tags
+            } else {
+                Vec::new()
+            };
+
+            if add {
+                // Add new tags, avoiding duplicates
+                for tag in &tags {
+                    if !new_tags.contains(tag) {
+                        new_tags.push(tag.clone());
+                    }
+                }
+            } else {
+                // Remove specified tags
+                new_tags.retain(|t| !tags.contains(t));
+            }
+
+            tx.execute(
+                "UPDATE screenshots SET tags = ? WHERE id = ?",
+                params![serde_json::to_string(&new_tags).context("Failed to serialize tags")?, id],
+            )
+            .context("Failed to update tags for screenshot")?;
+        }
+
+        tx.commit()
+            .context("Failed to commit batch tag transaction")?;
+        Ok(())
+    }
+
+    /// Batch archive screenshots in a single transaction
+    pub fn batch_archive(&self, screenshot_ids: Vec<i64>, archived: i32) -> Result<()> {
+        let mut conn = self.conn.lock().unwrap();
+        let mut tx = conn.transaction().context("Failed to start batch archive transaction")?;
+
+        for id in &screenshot_ids {
+            tx.execute(
+                "UPDATE screenshots SET is_archived = ? WHERE id = ?",
+                params![archived, id],
+            )
+            .context("Failed to archive screenshot")?;
+        }
+
+        tx.commit()
+            .context("Failed to commit batch archive transaction")?;
+        Ok(())
+    }
+
+    /// Batch add screenshots to a collection in a single transaction
+    pub fn batch_add_to_collection(&self, screenshot_ids: Vec<i64>, collection_id: &str) -> Result<()> {
+        let mut conn = self.conn.lock().unwrap();
+        let mut tx = conn.transaction().context("Failed to start batch add-to-collection transaction")?;
+
+        for id in &screenshot_ids {
+            // Check if already in collection
+            let exists: bool = tx
+                .query_row(
+                    "SELECT 1 FROM screenshot_collections WHERE screenshot_id = ? AND collection_id = ?",
+                    params![id, collection_id],
+                    |row| row.get(0),
+                )
+                .unwrap_or(false);
+
+            if !exists {
+                tx.execute(
+                    "INSERT INTO screenshot_collections (screenshot_id, collection_id) VALUES (?, ?)",
+                    params![id, collection_id],
+                )
+                .context("Failed to add screenshot to collection")?;
+            }
+        }
+
+        tx.commit()
+            .context("Failed to commit batch add-to-collection transaction")?;
+        Ok(())
+    }
+
+    /// Batch delete screenshots (DB-only, file deletion is handled in commands)
+    pub fn batch_delete_records(&self, screenshot_ids: Vec<i64>) -> Result<()> {
+        let mut conn = self.conn.lock().unwrap();
+        let mut tx = conn.transaction().context("Failed to start batch delete transaction")?;
+
+        for id in &screenshot_ids {
+            tx.execute("DELETE FROM screenshots WHERE id = ?", params![id])
+                .context("Failed to delete screenshot")?;
+        }
+
+        tx.commit()
+            .context("Failed to commit batch delete transaction")?;
+        Ok(())
+    }
+
+    /// Batch rename screenshots (per-file best-effort)
+    pub fn batch_rename_records(
+        &self,
+        screenshot_ids: Vec<i64>,
+        pattern: &str,
+    ) -> Result<Vec<FileOpError>> {
+        let mut errors = Vec::new();
+
+        for id in &screenshot_ids {
+            let screenshot = self.get_screenshot(*id);
+            let screenshot = match screenshot {
+                Ok(Some(s)) => s,
+                Ok(None) => {
+                    errors.push(FileOpError {
+                        id: *id,
+                        path: String::new(),
+                        error: "Screenshot not found".to_string(),
+                    });
+                    continue;
+                }
+                Err(e) => {
+                    errors.push(FileOpError {
+                        id: *id,
+                        path: String::new(),
+                        error: e.to_string(),
+                    });
+                    continue;
+                }
+            };
+
+            let new_filename = pattern.replace("%id%", &id.to_string())
+                .replace("%filename%", &screenshot.filename);
+
+            if new_filename == screenshot.filename {
+                continue;
+            }
+
+            let new_filepath = screenshot.filepath
+                .replace(&screenshot.filename, &new_filename);
+
+            // Update both DB and filesystem (blocking for rename)
+            if let Err(e) = std::fs::rename(&screenshot.filepath, &new_filepath) {
+                errors.push(FileOpError {
+                    id: *id,
+                    path: screenshot.filepath.clone(),
+                    error: e.to_string(),
+                });
+                continue;
+            }
+
+            // Update DB record
+            if let Err(e) = self.update_screenshot(
+                *id,
+                Some(&new_filepath),
+                Some(&new_filename),
+                None, None, None, None, None, None, None, None, None, None, None, None,
+            ) {
+                errors.push(FileOpError {
+                    id: *id,
+                    path: screenshot.filepath.clone(),
+                    error: e.to_string(),
+                });
+            }
+        }
+
+        Ok(errors)
+    }
+
+    /// Batch move screenshots to new directory (per-file best-effort)
+    pub fn batch_move_records(
+        &self,
+        screenshot_ids: Vec<i64>,
+        dest_dir: &str,
+    ) -> Result<Vec<FileOpError>> {
+        let mut errors = Vec::new();
+
+        for id in &screenshot_ids {
+            let screenshot = self.get_screenshot(*id);
+            let screenshot = match screenshot {
+                Ok(Some(s)) => s,
+                Ok(None) => {
+                    errors.push(FileOpError {
+                        id: *id,
+                        path: String::new(),
+                        error: "Screenshot not found".to_string(),
+                    });
+                    continue;
+                }
+                Err(e) => {
+                    errors.push(FileOpError {
+                        id: *id,
+                        path: String::new(),
+                        error: e.to_string(),
+                    });
+                    continue;
+                }
+            };
+
+            let new_filepath = format!("{}/{}", dest_dir.trim_end_matches('/'), screenshot.filename);
+
+            // Update both DB and filesystem (blocking for rename)
+            if let Err(e) = std::fs::rename(&screenshot.filepath, &new_filepath) {
+                errors.push(FileOpError {
+                    id: *id,
+                    path: screenshot.filepath.clone(),
+                    error: e.to_string(),
+                });
+                continue;
+            }
+
+            // Update DB record
+            if let Err(e) = self.update_screenshot(
+                *id,
+                Some(&new_filepath),
+                None,
+                None, None, None, None, None, None, None, None, None, None, None, None,
+            ) {
+                errors.push(FileOpError {
+                    id: *id,
+                    path: screenshot.filepath.clone(),
+                    error: e.to_string(),
+                });
+            }
+        }
+
+        Ok(errors)
+    }
+
+    // ============================================================================
+    // Collection methods
+    // ============================================================================
+
+    /// List all collections
+    pub fn list_collections(&self) -> Result<Vec<Collection>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT id, name, description, color, created_at, updated_at FROM collections ORDER BY created_at DESC"
+        )?;
+
+        let mut collections = Vec::new();
+        let rows = stmt.query_map([], |row| {
+            Ok(Collection {
+                id: row.get(0)?,
+                name: row.get(1)?,
+                description: row.get(2)?,
+                color: row.get(3)?,
+                created_at: row.get(4)?,
+                updated_at: row.get(5)?,
+            })
+        })?;
+
+        for row in rows {
+            collections.push(row.context("Failed to read collection row")?);
+        }
+
+        Ok(collections)
+    }
+
+    /// Create a new collection
+    pub fn create_collection(&self, name: &str, description: Option<&str>, color: Option<&str>) -> Result<String> {
+        let conn = self.conn.lock().unwrap();
+        let id = uuid::Uuid::new_v4().to_string();
+
+        conn.execute(
+            "INSERT INTO collections (id, name, description, color, created_at, updated_at) VALUES (?, ?, ?, ?, datetime('now'), datetime('now'))",
+            params![id, name, description.unwrap_or(""), color.unwrap_or("#3b82f6")],
+        )
+        .context("Failed to create collection")?;
+
+        Ok(id)
+    }
+
+    /// Get all screenshots in a collection
+    pub fn get_screenshots_in_collection(&self, collection_id: &str) -> Result<Vec<Screenshot>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT s.id, s.filepath, s.filename, s.width, s.height, s.status, s.category, s.category_source, s.tags, s.ocr_text, s.summary, s.app_detected, s.user_notes, s.is_archived, s.is_favorite, s.thumbnail, s.created_at, s.updated_at \
+             FROM screenshots s \
+             JOIN screenshot_collections sc ON s.id = sc.screenshot_id \
+             WHERE sc.collection_id = ? \
+             ORDER BY s.created_at DESC"
+        )?;
+
+        let mut screenshots = Vec::new();
+        let rows = stmt.query_map(params![collection_id], |row| {
+            Ok(Screenshot {
+                id: row.get(0)?,
+                filepath: row.get(1)?,
+                filename: row.get(2)?,
+                width: row.get(3)?,
+                height: row.get(4)?,
+                status: row.get(5)?,
+                category: row.get(6)?,
+                category_source: row.get(7)?,
+                tags: {
+                    let tags_str = row.get::<_, String>(8)?;
+                    serde_json::from_str(&tags_str).unwrap_or_default()
+                },
+                ocr_text: row.get(9)?,
+                summary: row.get(10)?,
+                app_detected: row.get(11)?,
+                user_notes: row.get(12)?,
+                is_archived: row.get(13)?,
+                is_favorite: row.get(14)?,
+                thumbnail: row.get(15)?,
+                created_at: row.get(16)?,
+                updated_at: row.get(17)?,
+            })
+        })?;
+
+        for row in rows {
+            screenshots.push(row.context("Failed to read screenshot row")?);
+        }
+
+        Ok(screenshots)
+    }
+}
+
+/// Collection record
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct Collection {
+    pub id: String,
+    pub name: String,
+    pub description: String,
+    pub color: String,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+/// Error result for filesystem batch operations
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct FileOpError {
+    pub id: i64,
+    pub path: String,
+    pub error: String,
 }
 
 /// Non-secret provider configuration row
@@ -782,7 +1162,7 @@ mod tests {
             "test.png",
             800,
             600,
-            "analyzed",
+            "enriched",
             Some("code"),
             "user",
             vec!["rust".to_string(), "ui".to_string()],
@@ -813,7 +1193,7 @@ mod tests {
                 &format!("test{}.png", i),
                 800 + i,
                 600 + i,
-                "analyzed",
+                "enriched",
                 Some("code"),
                 "user",
                 vec![],
@@ -839,7 +1219,7 @@ mod tests {
             "test.png",
             800,
             600,
-            "analyzed",
+            "enriched",
             Some("code"),
             "user",
             vec![],
@@ -870,7 +1250,7 @@ mod tests {
             "test.png",
             800,
             600,
-            "analyzed",
+            "enriched",
             Some("code"),
             "user",
             vec![],
@@ -923,12 +1303,12 @@ mod tests {
         let db = Database::open(test_db_path()).unwrap();
 
         db.insert_screenshot(
-            "/s/python_ml.png", "python_ml.png", 1920, 1080, "analyzed",
+            "/s/python_ml.png", "python_ml.png", 1920, 1080, "enriched",
             Some("code"), "ai", vec![], Some("python machine learning code".to_string()),
             None, None, 0, 0, None,
         ).unwrap();
         db.insert_screenshot(
-            "/s/design.png", "design.png", 1920, 1080, "analyzed",
+            "/s/design.png", "design.png", 1920, 1080, "enriched",
             Some("design"), "ai", vec![], Some("figma wireframe design".to_string()),
             None, None, 0, 0, None,
         ).unwrap();
@@ -948,12 +1328,12 @@ mod tests {
         let db = Database::open(test_db_path()).unwrap();
 
         db.insert_screenshot(
-            "/s/code.png", "code.png", 100, 100, "analyzed",
+            "/s/code.png", "code.png", 100, 100, "enriched",
             Some("code"), "ai", vec![], Some("rust programming language".to_string()),
             None, None, 0, 0, None,
         ).unwrap();
         db.insert_screenshot(
-            "/s/web.png", "web.png", 100, 100, "analyzed",
+            "/s/web.png", "web.png", 100, 100, "enriched",
             Some("web"), "ai", vec![], Some("rust web framework".to_string()),
             None, None, 0, 0, None,
         ).unwrap();
@@ -996,7 +1376,7 @@ mod tests {
         let db = Database::open(test_db_path()).unwrap();
 
         let id = db.insert_screenshot(
-            "/s/trigger.png", "trigger.png", 100, 100, "analyzed",
+            "/s/trigger.png", "trigger.png", 100, 100, "enriched",
             Some("code"), "ai", vec![], Some("original text before update".to_string()),
             None, None, 0, 0, None,
         ).unwrap();
@@ -1022,5 +1402,153 @@ mod tests {
             app_detected: None, limit: None, offset: None,
         }).unwrap();
         assert_eq!(new_results.len(), 1);
+    }
+
+    fn insert_test_screenshot(db: &Database, path: &str, name: &str) -> i64 {
+        db.insert_screenshot(path, name, 100, 100, "enriched", Some("code"), "ai",
+            vec![], None, None, None, 0, 0, None).unwrap()
+    }
+
+    // ---- batch tests ----
+
+    #[test]
+    fn test_batch_categorize_applies_to_all() {
+        let db = Database::open(test_db_path()).unwrap();
+        let id1 = insert_test_screenshot(&db, "/s/a.png", "a.png");
+        let id2 = insert_test_screenshot(&db, "/s/b.png", "b.png");
+        let id3 = insert_test_screenshot(&db, "/s/c.png", "c.png");
+
+        db.batch_categorize(vec![id1, id2, id3], "design", "user").unwrap();
+
+        for id in [id1, id2, id3] {
+            let s = db.get_screenshot(id).unwrap().unwrap();
+            assert_eq!(s.category, Some("design".to_string()));
+            assert_eq!(s.category_source, "user");
+        }
+    }
+
+    #[test]
+    fn test_batch_categorize_empty_ids_is_noop() {
+        let db = Database::open(test_db_path()).unwrap();
+        db.batch_categorize(vec![], "design", "user").unwrap();
+    }
+
+    #[test]
+    fn test_batch_tag_add_deduplicates() {
+        let db = Database::open(test_db_path()).unwrap();
+        let id = db.insert_screenshot("/s/t.png", "t.png", 100, 100, "enriched",
+            Some("code"), "ai", vec!["existing".to_string()], None, None, None, 0, 0, None).unwrap();
+
+        db.batch_tag(vec![id], vec!["new1".to_string(), "existing".to_string()], true).unwrap();
+
+        let s = db.get_screenshot(id).unwrap().unwrap();
+        assert!(s.tags.contains(&"new1".to_string()));
+        // "existing" must not be duplicated
+        let count = s.tags.iter().filter(|t| *t == "existing").count();
+        assert_eq!(count, 1);
+    }
+
+    #[test]
+    fn test_batch_tag_remove() {
+        let db = Database::open(test_db_path()).unwrap();
+        let id = db.insert_screenshot("/s/t.png", "t.png", 100, 100, "enriched",
+            Some("code"), "ai", vec!["keep".to_string(), "remove".to_string()],
+            None, None, None, 0, 0, None).unwrap();
+
+        db.batch_tag(vec![id], vec!["remove".to_string()], false).unwrap();
+
+        let s = db.get_screenshot(id).unwrap().unwrap();
+        assert!(s.tags.contains(&"keep".to_string()));
+        assert!(!s.tags.contains(&"remove".to_string()));
+    }
+
+    #[test]
+    fn test_batch_archive_sets_flag() {
+        let db = Database::open(test_db_path()).unwrap();
+        let id1 = insert_test_screenshot(&db, "/s/a.png", "a.png");
+        let id2 = insert_test_screenshot(&db, "/s/b.png", "b.png");
+
+        db.batch_archive(vec![id1, id2], 1).unwrap();
+
+        for id in [id1, id2] {
+            assert_eq!(db.get_screenshot(id).unwrap().unwrap().is_archived, 1);
+        }
+    }
+
+    #[test]
+    fn test_batch_delete_records_removes_all() {
+        let db = Database::open(test_db_path()).unwrap();
+        let id1 = insert_test_screenshot(&db, "/s/a.png", "a.png");
+        let id2 = insert_test_screenshot(&db, "/s/b.png", "b.png");
+
+        db.batch_delete_records(vec![id1, id2]).unwrap();
+
+        assert!(db.get_screenshot(id1).unwrap().is_none());
+        assert!(db.get_screenshot(id2).unwrap().is_none());
+    }
+
+    #[test]
+    fn test_batch_rename_partial_failure() {
+        let db = Database::open(test_db_path()).unwrap();
+
+        // Real temp file for the first screenshot
+        let tmp = std::env::temp_dir()
+            .join(format!("snapsort_rename_{}_{}", std::process::id(),
+                uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&tmp).unwrap();
+        let real_file = tmp.join("original.png");
+        std::fs::write(&real_file, b"fake").unwrap();
+
+        let id_real = db.insert_screenshot(
+            real_file.to_str().unwrap(), "original.png",
+            100, 100, "enriched", Some("code"), "ai", vec![], None, None, None, 0, 0, None,
+        ).unwrap();
+
+        // Second screenshot — file does not exist on disk
+        let id_missing = db.insert_screenshot(
+            "/nonexistent/path/missing.png", "missing.png",
+            100, 100, "enriched", Some("code"), "ai", vec![], None, None, None, 0, 0, None,
+        ).unwrap();
+
+        let errors = db.batch_rename_records(
+            vec![id_real, id_missing], "renamed_%id%.png"
+        ).unwrap();
+
+        // Only the missing file should error
+        assert_eq!(errors.len(), 1);
+        assert_eq!(errors[0].id, id_missing);
+
+        // The real file's DB record must be updated
+        let s = db.get_screenshot(id_real).unwrap().unwrap();
+        assert!(s.filename.starts_with("renamed_"), "filename was: {}", s.filename);
+
+        let _ = std::fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn test_batch_add_to_collection_atomic() {
+        let db = Database::open(test_db_path()).unwrap();
+        let id1 = insert_test_screenshot(&db, "/s/a.png", "a.png");
+        let id2 = insert_test_screenshot(&db, "/s/b.png", "b.png");
+
+        let col_id = db.create_collection("test-col", None, None).unwrap();
+        db.batch_add_to_collection(vec![id1, id2], &col_id).unwrap();
+
+        let in_col = db.get_screenshots_in_collection(&col_id).unwrap();
+        assert_eq!(in_col.len(), 2);
+    }
+
+    #[test]
+    fn test_batch_add_to_collection_no_duplicates() {
+        let db = Database::open(test_db_path()).unwrap();
+        let id = insert_test_screenshot(&db, "/s/a.png", "a.png");
+        let col_id = db.create_collection("dedup-col", None, None).unwrap();
+
+        // Add twice
+        db.batch_add_to_collection(vec![id], &col_id).unwrap();
+        db.batch_add_to_collection(vec![id], &col_id).unwrap();
+
+        let in_col = db.get_screenshots_in_collection(&col_id).unwrap();
+        assert_eq!(in_col.len(), 1, "duplicate insertion should be idempotent");
     }
 }

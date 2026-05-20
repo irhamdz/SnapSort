@@ -3,6 +3,7 @@ import { create } from 'zustand'
 export interface Screenshot {
   id: string
   filepath: string
+  filename: string
   width: number
   height: number
   status: 'detected' | 'queued' | 'ocr_complete' | 'ready' | 'analyzing' | 'enriched' | 'partial' | 'archived' | 'deleted'
@@ -22,6 +23,14 @@ interface GalleryState {
   isLoading: boolean
   error: string | null
 
+  // Selection state
+  selectedScreenshotIds: string[]
+
+  // UI state
+  showBatchActions: boolean
+  showDetailPanel: boolean
+  detailPanelScreenshot: Screenshot | null
+
   // Actions
   setScreenshots: (screenshots: Screenshot[]) => void
   addScreenshot: (screenshot: Screenshot) => void
@@ -29,6 +38,12 @@ interface GalleryState {
   removeScreenshot: (id: string) => void
   setLoading: (isLoading: boolean) => void
   setError: (error: string | null) => void
+  selectScreenshot: (id: string) => void
+  deselectScreenshot: (id: string) => void
+  setSelectedScreenshotIds: (ids: string[]) => void
+  setShowBatchActions: (show: boolean) => void
+  setShowDetailPanel: (show: boolean) => void
+  setDetailPanelScreenshot: (screenshot: Screenshot | null) => void
   reset: () => void
 }
 
@@ -37,6 +52,10 @@ export const useGalleryStore = create<GalleryState>((set) => ({
   screenshots: [],
   isLoading: false,
   error: null,
+  selectedScreenshotIds: [],
+  showBatchActions: false,
+  showDetailPanel: false,
+  detailPanelScreenshot: null,
 
   // Actions
   setScreenshots: (screenshots) => set({ screenshots, error: null }),
@@ -56,10 +75,29 @@ export const useGalleryStore = create<GalleryState>((set) => ({
     })),
   setLoading: (isLoading) => set({ isLoading }),
   setError: (error) => set({ error }),
+  selectScreenshot: (id) =>
+    set((state) => ({
+      selectedScreenshotIds: [...state.selectedScreenshotIds, id],
+    })),
+  deselectScreenshot: (id) =>
+    set((state) => ({
+      selectedScreenshotIds: state.selectedScreenshotIds.filter((sid) => sid !== id),
+    })),
+  setSelectedScreenshotIds: (ids) =>
+    set({
+      selectedScreenshotIds: ids,
+    }),
+  setShowBatchActions: (show) => set({ showBatchActions: show }),
+  setShowDetailPanel: (show) => set({ showDetailPanel: show }),
+  setDetailPanelScreenshot: (screenshot) => set({ detailPanelScreenshot: screenshot }),
   reset: () =>
     set({
       screenshots: [],
       isLoading: false,
       error: null,
+      selectedScreenshotIds: [],
+      showBatchActions: false,
+      showDetailPanel: false,
+      detailPanelScreenshot: null,
     }),
 }))

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import * as api from './index';
 
 describe('API Layer - Stub Implementation', () => {

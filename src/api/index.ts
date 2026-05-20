@@ -14,22 +14,22 @@ export async function loadScreenshots(): Promise<any[]> {
   return []
 }
 
-export async function getScreenshot(id: string): Promise<any> {
+export async function getScreenshot(_id: string): Promise<any> {
   // TODO: Implement
   return null
 }
 
-export async function deleteScreenshot(id: string): Promise<void> {
+export async function deleteScreenshot(_id: string): Promise<void> {
   // TODO: Implement
 }
 
-export async function archiveScreenshot(id: string, archived: boolean): Promise<void> {
+export async function archiveScreenshot(_id: string, _archived: boolean): Promise<void> {
   // TODO: Implement
 }
 
 export async function updateScreenshotMetadata(
-  id: string,
-  metadata: Partial<any>
+  _id: string,
+  _metadata: Partial<any>
 ): Promise<void> {
   // TODO: Implement
 }
@@ -41,9 +41,9 @@ export async function getCategories(): Promise<string[]> {
 }
 
 export async function assignCategory(
-  screenshotId: string,
-  category: string,
-  source: 'ai' | 'user'
+  _screenshotId: string,
+  _category: string,
+  _source: 'ai' | 'user'
 ): Promise<void> {
   // TODO: Implement
 }
@@ -54,41 +54,41 @@ export async function getTags(): Promise<string[]> {
   return []
 }
 
-export async function addTags(screenshotId: string, tags: string[]): Promise<void> {
+export async function addTags(_screenshotId: string, _tags: string[]): Promise<void> {
   // TODO: Implement
 }
 
-export async function removeTags(screenshotId: string, tags: string[]): Promise<void> {
+export async function removeTags(_screenshotId: string, _tags: string[]): Promise<void> {
   // TODO: Implement
 }
 
 // OCR commands
-export async function getOCRText(screenshotId: string): Promise<string> {
+export async function getOCRText(_screenshotId: string): Promise<string> {
   // TODO: Implement
   return ''
 }
 
-export async function copyOCRTextToClipboard(screenshotId: string): Promise<void> {
+export async function copyOCRTextToClipboard(_screenshotId: string): Promise<void> {
   // TODO: Implement
 }
 
 // Batch operations
 export async function batchDelete(screenshotIds: string[]): Promise<void> {
-  // TODO: Implement
+  return invoke('batch_delete', { screenshotIds })
 }
 
 export async function batchCategorize(
   screenshotIds: string[],
   category: string
 ): Promise<void> {
-  // TODO: Implement
+  return invoke('batch_categorize', { screenshotIds, category })
 }
 
 export async function batchRename(
   screenshotIds: string[],
   pattern: string
 ): Promise<void> {
-  // TODO: Implement
+  return invoke('batch_rename', { screenshotIds, pattern })
 }
 
 export async function batchTag(
@@ -96,31 +96,31 @@ export async function batchTag(
   tags: string[],
   add: boolean
 ): Promise<void> {
-  // TODO: Implement
+  return invoke('batch_tag', { screenshotIds, tags, add })
 }
 
 export async function batchArchive(screenshotIds: string[]): Promise<void> {
-  // TODO: Implement
+  return invoke('batch_archive', { screenshotIds })
 }
 
 export async function batchMove(screenshotIds: string[], destPath: string): Promise<void> {
-  // TODO: Implement
+  return invoke('batch_move', { screenshotIds, destPath })
 }
 
 export async function batchAddToCollection(
   screenshotIds: string[],
   collectionId: string
 ): Promise<void> {
-  // TODO: Implement
+  return invoke('batch_add_to_collection', { screenshotIds, collectionId })
 }
 
 // Search commands
-export async function searchScreenshots(query: string): Promise<any[]> {
+export async function searchScreenshots(_query: string): Promise<any[]> {
   // TODO: Implement
   return []
 }
 
-export async function searchWithFilters(filters: any): Promise<any[]> {
+export async function searchWithFilters(_filters: any): Promise<any[]> {
   // TODO: Implement
   return []
 }
@@ -179,40 +179,38 @@ export async function deleteApiKey(providerId: string): Promise<void> {
 }
 
 // AI analysis commands
-export async function runAIAnalysis(screenshotId: string): Promise<void> {
+export async function runAIAnalysis(_screenshotId: string): Promise<void> {
   // TODO: Implement
 }
 
-export async function getAIAnalysisStatus(screenshotId: string): Promise<any> {
+export async function getAIAnalysisStatus(_screenshotId: string): Promise<any> {
   // TODO: Implement
   return null
 }
 
 // Collection commands
 export async function getCollections(): Promise<any[]> {
-  // TODO: Implement
-  return []
+  return invoke('get_collections')
 }
 
 export async function createCollection(name: string): Promise<string> {
-  // TODO: Implement
-  throw new Error('Not implemented')
+  return invoke('create_collection', { name })
 }
 
 export async function addToCollection(screenshotId: string, collectionId: string): Promise<void> {
-  // TODO: Implement
+  return invoke('add_to_collection', { screenshotId, collectionId })
 }
 
 export async function removeFromCollection(screenshotId: string, collectionId: string): Promise<void> {
-  // TODO: Implement
+  return invoke('remove_from_collection', { screenshotId, collectionId })
 }
 
 // Watch folder commands
-export async function addWatchFolder(path: string): Promise<void> {
+export async function addWatchFolder(_path: string): Promise<void> {
   // TODO: Implement
 }
 
-export async function removeWatchFolder(path: string): Promise<void> {
+export async function removeWatchFolder(_path: string): Promise<void> {
   // TODO: Implement
 }
 
@@ -232,7 +230,7 @@ export async function getSettings(): Promise<any> {
   return {}
 }
 
-export async function saveSettings(settings: any): Promise<void> {
+export async function saveSettings(_settings: any): Promise<void> {
   // TODO: Implement
 }
 
@@ -242,20 +240,20 @@ export async function getSmartFolders(): Promise<any[]> {
   return []
 }
 
-export async function getSmartFolderContent(folderId: string): Promise<any[]> {
+export async function getSmartFolderContent(_folderId: string): Promise<any[]> {
   // TODO: Implement
   return []
 }
 
 // File operations
-export async function openInFinder(path: string): Promise<void> {
+export async function openInFinder(_path: string): Promise<void> {
   // TODO: Implement
 }
 
-export async function copyPathToClipboard(path: string): Promise<void> {
+export async function copyPathToClipboard(_path: string): Promise<void> {
   // TODO: Implement
 }
 
-export async function exportScreenshot(screenshotId: string, format: string): Promise<void> {
+export async function exportScreenshot(_screenshotId: string, _format: string): Promise<void> {
   // TODO: Implement
 }
