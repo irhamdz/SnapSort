@@ -14,6 +14,7 @@ export function BatchActionBar() {
   const [showTagModal, setShowTagModal] = useState(false)
   const [showCollectionModal, setShowCollectionModal] = useState(false)
   const [showMoveModal, setShowMoveModal] = useState(false)
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [category, setCategory] = useState('')
   const [tags, setTags] = useState<string[]>([])
   const [newTag, setNewTag] = useState('')
@@ -142,11 +143,7 @@ export function BatchActionBar() {
                   Move
                 </button>
                 <button
-                  onClick={async () => {
-                    if (confirm(`Delete ${selectedCount} screenshots? This cannot be undone.`)) {
-                      await useBatchStore.getState().deleteSelected()
-                    }
-                  }}
+                  onClick={() => setShowDeleteModal(true)}
                   className="px-3 py-1.5 text-sm rounded-md border border-red-500 hover:bg-red-500/10 text-red-500"
                 >
                   Delete
@@ -290,6 +287,37 @@ export function BatchActionBar() {
                 className="px-3 py-1.5 text-sm rounded-md bg-primary hover:bg-primary/90"
               >
                 Create & Add
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal — explicit click only, no Enter shortcut */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setShowDeleteModal(false)}>
+          <div className="bg-card rounded-lg p-6 max-w-sm w-full" onClick={e => e.stopPropagation()}>
+            <h3 className="text-lg font-bold mb-2">Delete {selectedCount} screenshot{selectedCount !== 1 ? 's' : ''}?</h3>
+            <p className="text-sm text-muted-foreground mb-6">
+              Files will be moved to the OS Trash. This cannot be undone inside the app.
+            </p>
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setShowDeleteModal(false)}
+                className="px-3 py-1.5 text-sm rounded-md border hover:bg-muted"
+              >
+                Cancel
+              </button>
+              {/* Destructive action requires explicit mouse click — not bound to Enter */}
+              <button
+                type="button"
+                onClick={async () => {
+                  setShowDeleteModal(false)
+                  await useBatchStore.getState().deleteSelected()
+                }}
+                className="px-3 py-1.5 text-sm rounded-md bg-red-600 hover:bg-red-700 text-white"
+              >
+                Delete {selectedCount}
               </button>
             </div>
           </div>

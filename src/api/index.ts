@@ -19,8 +19,8 @@ export async function getScreenshot(_id: string): Promise<any> {
   return null
 }
 
-export async function deleteScreenshot(_id: string): Promise<void> {
-  // TODO: Implement
+export async function deleteScreenshot(id: string): Promise<void> {
+  return invoke('delete_screenshot', { id: parseInt(id, 10) })
 }
 
 export async function archiveScreenshot(_id: string, _archived: boolean): Promise<void> {
@@ -73,7 +73,9 @@ export async function copyOCRTextToClipboard(_screenshotId: string): Promise<voi
 }
 
 // Batch operations
-export async function batchDelete(screenshotIds: string[]): Promise<void> {
+export type FileOpError = { id: number; path: string; error: string }
+
+export async function batchDelete(screenshotIds: string[]): Promise<FileOpError[]> {
   return invoke('batch_delete', { screenshotIds })
 }
 

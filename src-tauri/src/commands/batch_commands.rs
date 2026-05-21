@@ -4,39 +4,47 @@ use crate::db::FileOpError;
 use anyhow::Result;
 use tauri::State;
 
-/// Batch delete screenshots
-/// Sends files to OS Trash, removes DB records
+/// Batch delete screenshots.
+/// Files are sent to OS Trash per-file best-effort; failures are reported.
+/// DB records are removed atomically after the Trash pass.
 #[tauri::command]
 pub async fn batch_delete(
     screenshot_ids: Vec<String>,
     state: State<'_, crate::AppState>,
-) -> Result<(), String> {
+) -> Result<Vec<FileOpError>, String> {
     let id_vec: Vec<i64> = screenshot_ids
         .iter()
         .map(|s| s.parse::<i64>())
         .collect::<Result<Vec<_>, _>>()
         .map_err(|e| format!("Invalid screenshot ID format: {}", e))?;
 
-    // Get screenshots to get their file paths
-    let screenshots = state
-        .db
-        .list_screenshots(Some(id_vec.len() as usize), Some(0))
-        .map_err(|e| format!("Failed to get screenshots: {}", e))?;
+    let mut trash_errors: Vec<FileOpError> = Vec::new();
 
-    // Delete files from OS Trash first (per-file best-effort)
-    for screenshot in &screenshots {
-        if let Err(e) = trash::delete(&screenshot.filepath) {
-            tracing::warn!("Failed to delete {} to Trash: {}", screenshot.filepath, e);
+    // Per-file best-effort: send each file to OS Trash.
+    for &id in &id_vec {
+        match state.db.get_screenshot(id) {
+            Ok(Some(s)) => {
+                if let Err(e) = trash::delete(&s.filepath) {
+                    tracing::warn!("Failed to move {} to Trash: {e}", s.filepath);
+                    trash_errors.push(FileOpError {
+                        id,
+                        path: s.filepath.clone(),
+                        error: e.to_string(),
+                    });
+                }
+            }
+            Ok(None) => tracing::warn!("Screenshot {id} not found; skipping Trash step"),
+            Err(e) => tracing::warn!("Failed to fetch screenshot {id}: {e}"),
         }
     }
 
-    // Then delete DB records (atomic — all-or-nothing)
+    // Remove DB records atomically regardless of any Trash failures.
     state
         .db
         .batch_delete_records(id_vec)
         .map_err(|e| format!("Failed to delete screenshots from database: {}", e))?;
 
-    Ok(())
+    Ok(trash_errors)
 }
 
 /// Batch categorize screenshots

@@ -42,6 +42,7 @@ fn main() {
         })
         .invoke_handler(tauri::generate_handler![
             snapsort::commands::health_check,
+            snapsort::commands::delete_screenshot,
             snapsort::commands::add_watch_folder,
             snapsort::commands::remove_watch_folder,
             snapsort::commands::list_watch_folders,
