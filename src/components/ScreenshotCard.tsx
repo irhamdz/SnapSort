@@ -1,13 +1,20 @@
 import React from 'react'
 
 interface ScreenshotCardProps {
+  id?: string
   filename: string
+  filepath?: string
+  width?: number
+  height?: number
   thumbnail?: string | null
   isSelected: boolean
+  isSelectAll?: boolean
   onSelect: (e?: React.MouseEvent, id?: string) => void
+  onToggleSelectAll?: (e?: React.ChangeEvent<HTMLInputElement>) => void
 }
 
 export function ScreenshotCard({
+  id,
   filename,
   thumbnail,
   isSelected,
@@ -16,7 +23,7 @@ export function ScreenshotCard({
   const [showDetail, setShowDetail] = React.useState(false)
 
   const handleClick = (e: React.MouseEvent) => {
-    onSelect(e)
+    onSelect(e, id)
     setShowDetail(true)
   }
 

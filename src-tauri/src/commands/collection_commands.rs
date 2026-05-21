@@ -2,7 +2,6 @@
 
 use crate::db::Collection;
 use anyhow::Result;
-use rusqlite::params;
 use tauri::State;
 
 /// List all collections
@@ -68,14 +67,8 @@ pub async fn remove_from_collection(
         return Err("Collection ID cannot be empty".to_string());
     }
 
-    let conn = state.db.get_connection();
-    let conn = conn.lock().unwrap();
-
-    conn.execute(
-        "DELETE FROM screenshot_collections WHERE screenshot_id = ? AND collection_id = ?",
-        params![id, collection_id],
-    )
-    .map_err(|e| format!("Failed to remove screenshot from collection: {}", e))?;
-
-    Ok(())
+    state
+        .db
+        .remove_from_collection(id, &collection_id)
+        .map_err(|e| e.to_string())
 }

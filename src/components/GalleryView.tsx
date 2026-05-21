@@ -57,11 +57,12 @@ export function GalleryView() {
   }, [clearSelection, setShowDetailPanel])
 
   const handleSelectScreenshot = useCallback(
-    (_e: React.MouseEvent, id?: string) => {
+    (_e?: React.MouseEvent, id?: string) => {
       if (id) {
         useBatchStore.getState().toggleSelection(id)
       }
-    }
+    },
+    []
   )
 
   return (

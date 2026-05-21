@@ -1,4 +1,5 @@
-// Library entry point for Tauri commands
+// Library entry point for Tauri commands.
+// IPC contract rule: all SQL stays in db/, never in commands/. See .baton/docs/ipc-contract.md.
 pub mod commands;
 pub mod db;
 pub mod ai;

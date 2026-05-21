@@ -1,13 +1,15 @@
 import { create } from 'zustand'
 import { useBatchStore as selectionStore } from './useBatchStore'
-import { invoke } from '@tauri-apps/api/core'
-
-// File operation error result
-export interface FileOpError {
-  id: string
-  path: string
-  error: string
-}
+import {
+  batchDelete,
+  batchCategorize,
+  batchRename,
+  batchTag,
+  batchArchive,
+  batchMove,
+  batchAddToCollection,
+  FileOpError,
+} from '../api'
 
 // Store interface for batch operations state
 interface BatchState {
@@ -53,9 +55,9 @@ export const useBatchStore = create<BatchState>((set) => ({
   selectAll: () => {
     const { selection } = selectionStore.getState()
     if (selection.selectedIds.includes('all')) {
-      selectionStore.getState().toggleSelectAll() // Deselect all
+      selectionStore.getState().toggleSelectAll()
     } else {
-      selectionStore.getState().toggleSelectAll() // Select all
+      selectionStore.getState().toggleSelectAll()
     }
     set({ lastAction: 'Select All' })
   },
@@ -70,7 +72,7 @@ export const useBatchStore = create<BatchState>((set) => ({
     const { selection } = selectionStore.getState()
     set({
       selectedCount: selection.selectedIds.includes('all')
-        ? -1 // Select all mode
+        ? -1
         : selection.selectedIds.length,
       isSelectAll: selection.selectedIds.includes('all'),
       lastAction: selection.selectedIds.includes('all') ? 'Select All' : null,
@@ -94,13 +96,16 @@ export const useBatchStore = create<BatchState>((set) => ({
     set({ lastAction: 'Deleting...' })
 
     try {
-      await invoke('batch_delete', { screenshotIds: selection.selectedIds })
+      const errors = await batchDelete(selection.selectedIds)
       selectionStore.getState().reset()
-      set({ lastAction: 'Deleted', lastErrors: null })
+      set({
+        lastAction: errors.length > 0 ? 'Delete Partially Failed' : 'Deleted',
+        lastErrors: errors.length > 0 ? errors : null,
+      })
     } catch (error) {
       set({
         lastAction: 'Delete Failed',
-        lastErrors: [{ id: 'batch', path: '', error: error instanceof Error ? error.message : String(error) }],
+        lastErrors: [{ id: 0, path: '', error: error instanceof Error ? error.message : String(error) }],
       })
     }
   },
@@ -112,13 +117,13 @@ export const useBatchStore = create<BatchState>((set) => ({
     set({ lastAction: 'Categorizing...' })
 
     try {
-      await invoke('batch_categorize', { screenshotIds: selection.selectedIds, category })
+      await batchCategorize(selection.selectedIds, category)
       selectionStore.getState().reset()
       set({ lastAction: 'Categorized', lastErrors: null })
     } catch (error) {
       set({
         lastAction: 'Categorize Failed',
-        lastErrors: [{ id: 'batch', path: '', error: error instanceof Error ? error.message : String(error) }],
+        lastErrors: [{ id: 0, path: '', error: error instanceof Error ? error.message : String(error) }],
       })
     }
   },
@@ -130,13 +135,16 @@ export const useBatchStore = create<BatchState>((set) => ({
     set({ lastAction: 'Renaming...' })
 
     try {
-      const errors = await invoke<FileOpError[]>('batch_rename', { screenshotIds: selection.selectedIds, pattern })
+      const errors = await batchRename(selection.selectedIds, pattern)
       selectionStore.getState().reset()
-      set({ lastAction: errors.length > 0 ? 'Rename Partially Failed' : 'Renamed', lastErrors: errors.length > 0 ? errors : null })
+      set({
+        lastAction: errors.length > 0 ? 'Rename Partially Failed' : 'Renamed',
+        lastErrors: errors.length > 0 ? errors : null,
+      })
     } catch (error) {
       set({
         lastAction: 'Rename Failed',
-        lastErrors: [{ id: 'batch', path: '', error: error instanceof Error ? error.message : String(error) }],
+        lastErrors: [{ id: 0, path: '', error: error instanceof Error ? error.message : String(error) }],
       })
     }
   },
@@ -148,13 +156,13 @@ export const useBatchStore = create<BatchState>((set) => ({
     set({ lastAction: 'Tagging...' })
 
     try {
-      await invoke('batch_tag', { screenshotIds: selection.selectedIds, tags, add })
+      await batchTag(selection.selectedIds, tags, add)
       selectionStore.getState().reset()
       set({ lastAction: 'Tagged', lastErrors: null })
     } catch (error) {
       set({
         lastAction: 'Tag Failed',
-        lastErrors: [{ id: 'batch', path: '', error: error instanceof Error ? error.message : String(error) }],
+        lastErrors: [{ id: 0, path: '', error: error instanceof Error ? error.message : String(error) }],
       })
     }
   },
@@ -166,13 +174,13 @@ export const useBatchStore = create<BatchState>((set) => ({
     set({ lastAction: 'Archiving...' })
 
     try {
-      await invoke('batch_archive', { screenshotIds: selection.selectedIds })
+      await batchArchive(selection.selectedIds)
       selectionStore.getState().reset()
       set({ lastAction: 'Archived', lastErrors: null })
     } catch (error) {
       set({
         lastAction: 'Archive Failed',
-        lastErrors: [{ id: 'batch', path: '', error: error instanceof Error ? error.message : String(error) }],
+        lastErrors: [{ id: 0, path: '', error: error instanceof Error ? error.message : String(error) }],
       })
     }
   },
@@ -184,13 +192,16 @@ export const useBatchStore = create<BatchState>((set) => ({
     set({ lastAction: 'Moving...' })
 
     try {
-      const errors = await invoke<FileOpError[]>('batch_move', { screenshotIds: selection.selectedIds, destPath })
+      const errors = await batchMove(selection.selectedIds, destPath)
       selectionStore.getState().reset()
-      set({ lastAction: errors.length > 0 ? 'Move Partially Failed' : 'Moved', lastErrors: errors.length > 0 ? errors : null })
+      set({
+        lastAction: errors.length > 0 ? 'Move Partially Failed' : 'Moved',
+        lastErrors: errors.length > 0 ? errors : null,
+      })
     } catch (error) {
       set({
         lastAction: 'Move Failed',
-        lastErrors: [{ id: 'batch', path: '', error: error instanceof Error ? error.message : String(error) }],
+        lastErrors: [{ id: 0, path: '', error: error instanceof Error ? error.message : String(error) }],
       })
     }
   },
@@ -202,13 +213,13 @@ export const useBatchStore = create<BatchState>((set) => ({
     set({ lastAction: 'Adding to collection...' })
 
     try {
-      await invoke('batch_add_to_collection', { screenshotIds: selection.selectedIds, collectionId })
+      await batchAddToCollection(selection.selectedIds, collectionId)
       selectionStore.getState().reset()
       set({ lastAction: 'Added to collection', lastErrors: null })
     } catch (error) {
       set({
         lastAction: 'Add to collection Failed',
-        lastErrors: [{ id: 'batch', path: '', error: error instanceof Error ? error.message : String(error) }],
+        lastErrors: [{ id: 0, path: '', error: error instanceof Error ? error.message : String(error) }],
       })
     }
   },

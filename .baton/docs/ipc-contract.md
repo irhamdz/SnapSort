@@ -118,6 +118,40 @@ npm test
 npm run lint:ipc
 ```
 
+## Command Inventory
+
+All registered Tauri commands and their typed `src/api/index.ts` wrappers:
+
+| Rust command | TS wrapper | Module |
+|---|---|---|
+| `health_check` | — (internal) | `commands/mod.rs` |
+| `delete_screenshot` | `deleteScreenshot` | `commands/screenshots.rs` |
+| `add_watch_folder` | `addWatchFolder` | `commands/mod.rs` |
+| `remove_watch_folder` | `removeWatchFolder` | `commands/mod.rs` |
+| `list_watch_folders` | `getWatchFolders` | `commands/mod.rs` |
+| `search_screenshots` | `searchScreenshots` | `commands/mod.rs` |
+| `get_status_counts` | — | `commands/mod.rs` |
+| `retry_partial_analysis` | — | `commands/mod.rs` |
+| `get_providers` | `getProviders` | `commands/ai.rs` |
+| `add_provider` | `addProvider` | `commands/ai.rs` |
+| `remove_provider` | `removeProvider` | `commands/ai.rs` |
+| `test_connection` | `testConnection` | `commands/ai.rs` |
+| `set_active_provider` | `setActiveProvider` | `commands/ai.rs` |
+| `set_api_key` | `setApiKey` | `commands/ai.rs` |
+| `has_api_key` | `hasApiKey` | `commands/ai.rs` |
+| `delete_api_key` | `deleteApiKey` | `commands/ai.rs` |
+| `batch_delete` | `batchDelete` | `commands/batch_commands.rs` |
+| `batch_categorize` | `batchCategorize` | `commands/batch_commands.rs` |
+| `batch_rename` | `batchRename` | `commands/batch_commands.rs` |
+| `batch_tag` | `batchTag` | `commands/batch_commands.rs` |
+| `batch_archive` | `batchArchive` | `commands/batch_commands.rs` |
+| `batch_move` | `batchMove` | `commands/batch_commands.rs` |
+| `batch_add_to_collection` | `batchAddToCollection` | `commands/batch_commands.rs` |
+| `get_collections` | `getCollections` | `commands/collection_commands.rs` |
+| `create_collection` | `createCollection` | `commands/collection_commands.rs` |
+| `add_to_collection` | `addToCollection` | `commands/collection_commands.rs` |
+| `remove_from_collection` | `removeFromCollection` | `commands/collection_commands.rs` |
+
 ## Type Parity Strategy
 
 TypeScript types and Rust command signatures are currently maintained by hand. For future evolution:

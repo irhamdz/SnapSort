@@ -1008,6 +1008,16 @@ let rows = stmt.query_map(
 
         Ok(screenshots)
     }
+
+    pub fn remove_from_collection(&self, screenshot_id: i64, collection_id: &str) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "DELETE FROM screenshot_collections WHERE screenshot_id = ? AND collection_id = ?",
+            params![screenshot_id, collection_id],
+        )
+        .context("Failed to remove screenshot from collection")?;
+        Ok(())
+    }
 }
 
 /// Collection record

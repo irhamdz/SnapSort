@@ -89,7 +89,7 @@ export async function batchCategorize(
 export async function batchRename(
   screenshotIds: string[],
   pattern: string
-): Promise<void> {
+): Promise<FileOpError[]> {
   return invoke('batch_rename', { screenshotIds, pattern })
 }
 
@@ -105,7 +105,7 @@ export async function batchArchive(screenshotIds: string[]): Promise<void> {
   return invoke('batch_archive', { screenshotIds })
 }
 
-export async function batchMove(screenshotIds: string[], destPath: string): Promise<void> {
+export async function batchMove(screenshotIds: string[], destPath: string): Promise<FileOpError[]> {
   return invoke('batch_move', { screenshotIds, destPath })
 }
 
